@@ -5,414 +5,292 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Dedicated Inference — Metrics Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.7.3/Recharts.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/recharts@2.15.3/umd/Recharts.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#08090d;--surface:#0f1117;--surface2:#161820;--surface3:#1c1e28;--border:#252736;--borderLight:#2f3249;--text:#e2e4ed;--textDim:#7a7f99;--textMuted:#4e5269;--accent:#3b82f6;--accentDim:rgba(59,130,246,0.12);--green:#10b981;--greenDim:rgba(16,185,129,0.12);--red:#ef4444;--redDim:rgba(239,68,68,0.12);--orange:#f59e0b;--orangeDim:rgba(245,158,11,0.12);--cyan:#06b6d4;--cyanDim:rgba(6,182,212,0.12);--purple:#8b5cf6;--purpleDim:rgba(139,92,246,0.12)}
-body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body{font-family:'Outfit',sans-serif;background:#08090d;color:#e2e4ed;min-height:100vh;overflow-x:hidden}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.chart-card{animation:fadeIn .4s ease forwards}
-::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.fade{animation:fadeIn .4s ease forwards}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:#08090d}
+::-webkit-scrollbar-thumb{background:#252736;border-radius:3px}
 </style>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel">
-const {useState,useEffect,useCallback}=React;
-const {LineChart,Line,AreaChart,Area,BarChart,Bar,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell}=Recharts;
+<script>
+var e=React.createElement;
+var RC=Recharts;
 
-const C={bg:"#08090d",surface:"#0f1117",surface2:"#161820",surface3:"#1c1e28",border:"#252736",borderLight:"#2f3249",text:"#e2e4ed",textDim:"#7a7f99",textMuted:"#4e5269",accent:"#3b82f6",accentDim:"rgba(59,130,246,0.12)",green:"#10b981",greenDim:"rgba(16,185,129,0.12)",red:"#ef4444",redDim:"rgba(239,68,68,0.12)",orange:"#f59e0b",orangeDim:"rgba(245,158,11,0.12)",cyan:"#06b6d4",cyanDim:"rgba(6,182,212,0.12)",purple:"#8b5cf6",purpleDim:"rgba(139,92,246,0.12)"};
+var C={bg:"#08090d",sf:"#0f1117",sf2:"#161820",sf3:"#1c1e28",bd:"#252736",tx:"#e2e4ed",td:"#7a7f99",tm:"#4e5269",ac:"#3b82f6",acd:"rgba(59,130,246,0.12)",gn:"#10b981",gnd:"rgba(16,185,129,0.12)",rd:"#ef4444",rdd:"rgba(239,68,68,0.12)",or:"#f59e0b",ord:"rgba(245,158,11,0.12)",cy:"#06b6d4",cyd:"rgba(6,182,212,0.12)",pu:"#8b5cf6",pud:"rgba(139,92,246,0.12)"};
 
-const genTS=(hours,base,variance,trend=0)=>{const d=[];const now=new Date();for(let i=hours;i>=0;i--){const t=new Date(now-i*3600000);const n=(Math.random()-.5)*variance;const tv=trend*(hours-i);const s=Math.random()>.92?variance*1.5:0;d.push({time:t.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),value:Math.max(0,Math.round((base+n+tv+s)*100)/100)})}return d};
+function genTS(hrs,base,v,trend){
+trend=trend||0;var d=[];var now=new Date();
+for(var i=hrs;i>=0;i--){var t=new Date(now-i*3600000);var n=(Math.random()-.5)*v;var tv=trend*(hrs-i);var s=Math.random()>.92?v*1.5:0;
+d.push({time:t.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),value:Math.max(0,Math.round((base+n+tv+s)*100)/100)})}return d}
 
-const genLatency=(hours)=>{const d=[];const now=new Date();for(let i=hours;i>=0;i--){const t=new Date(now-i*3600000);const b=45+Math.random()*15;d.push({time:t.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),p50:Math.round(b),p95:Math.round(b*2.2+Math.random()*20),p99:Math.round(b*3.8+Math.random()*40)})}return d};
+function genLat(hrs){var d=[];var now=new Date();
+for(var i=hrs;i>=0;i--){var t=new Date(now-i*3600000);var b=45+Math.random()*15;
+d.push({time:t.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),p50:Math.round(b),p95:Math.round(b*2.2+Math.random()*20),p99:Math.round(b*3.8+Math.random()*40)})}return d}
 
-const genThroughput=(hours)=>{const d=[];const now=new Date();for(let i=hours;i>=0;i--){const t=new Date(now-i*3600000);const h=t.getHours();const m=h>=9&&h<=17?1.8:h>=6&&h<=20?1.2:.6;d.push({time:t.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),rps:Math.round(2400*m+(Math.random()-.5)*400),tokens:Math.round(185000*m+(Math.random()-.5)*30000)})}return d};
+function genTP(hrs){var d=[];var now=new Date();
+for(var i=hrs;i>=0;i--){var t=new Date(now-i*3600000);var h=t.getHours();var m=h>=9&&h<=17?1.8:h>=6&&h<=20?1.2:.6;
+d.push({time:t.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),rps:Math.round(2400*m+(Math.random()-.5)*400)})}return d}
 
-const GPU_NODES=[
-{id:"gpu-a100-01",type:"A100-80GB",util:87,mem:71,temp:68,status:"active",model:"Llama-3.1-70B",vram:"57/80 GB",power:"287W"},
-{id:"gpu-a100-02",type:"A100-80GB",util:93,mem:82,temp:72,status:"active",model:"Llama-3.1-70B",vram:"66/80 GB",power:"312W"},
-{id:"gpu-a100-03",type:"A100-80GB",util:45,mem:68,temp:61,status:"active",model:"Mistral-7B-v0.3",vram:"14/80 GB",power:"198W"},
-{id:"gpu-a100-04",type:"A100-80GB",util:78,mem:75,temp:66,status:"active",model:"Llama-3.1-70B",vram:"60/80 GB",power:"275W"},
-{id:"gpu-h100-01",type:"H100-80GB",util:91,mem:88,temp:70,status:"active",model:"Mixtral-8x22B",vram:"71/80 GB",power:"445W"},
-{id:"gpu-h100-02",type:"H100-80GB",util:62,mem:55,temp:58,status:"active",model:"CodeLlama-34B",vram:"44/80 GB",power:"342W"},
-{id:"gpu-h100-03",type:"H100-80GB",util:0,mem:2,temp:34,status:"idle",model:"—",vram:"2/80 GB",power:"72W"},
-{id:"gpu-a100-05",type:"A100-80GB",util:3,mem:5,temp:38,status:"draining",model:"—",vram:"4/80 GB",power:"85W"},
+var GPUS=[
+{id:"gpu-a100-01",type:"A100-80GB",util:87,mem:71,temp:68,st:"active",model:"Llama-3.1-70B",vram:"57/80 GB",pw:"287W"},
+{id:"gpu-a100-02",type:"A100-80GB",util:93,mem:82,temp:72,st:"active",model:"Llama-3.1-70B",vram:"66/80 GB",pw:"312W"},
+{id:"gpu-a100-03",type:"A100-80GB",util:45,mem:68,temp:61,st:"active",model:"Mistral-7B-v0.3",vram:"14/80 GB",pw:"198W"},
+{id:"gpu-a100-04",type:"A100-80GB",util:78,mem:75,temp:66,st:"active",model:"Llama-3.1-70B",vram:"60/80 GB",pw:"275W"},
+{id:"gpu-h100-01",type:"H100-80GB",util:91,mem:88,temp:70,st:"active",model:"Mixtral-8x22B",vram:"71/80 GB",pw:"445W"},
+{id:"gpu-h100-02",type:"H100-80GB",util:62,mem:55,temp:58,st:"active",model:"CodeLlama-34B",vram:"44/80 GB",pw:"342W"},
+{id:"gpu-h100-03",type:"H100-80GB",util:0,mem:2,temp:34,st:"idle",model:"\u2014",vram:"2/80 GB",pw:"72W"},
+{id:"gpu-a100-05",type:"A100-80GB",util:3,mem:5,temp:38,st:"draining",model:"\u2014",vram:"4/80 GB",pw:"85W"}
 ];
 
-const MODEL_DEPLOYMENTS=[
-{name:"Llama-3.1-70B",replicas:3,rps:1842,ttft:"52ms",tps:"78 t/s",uptime:"99.99%",cost:"$8.64/hr",status:"healthy"},
-{name:"Mixtral-8x22B",replicas:1,rps:624,ttft:"68ms",tps:"45 t/s",uptime:"99.98%",cost:"$4.12/hr",status:"healthy"},
-{name:"Mistral-7B-v0.3",replicas:1,rps:2105,ttft:"18ms",tps:"142 t/s",uptime:"100%",cost:"$2.88/hr",status:"healthy"},
-{name:"CodeLlama-34B",replicas:1,rps:388,ttft:"41ms",tps:"92 t/s",uptime:"99.97%",cost:"$4.12/hr",status:"scaling"},
+var MODELS=[
+{name:"Llama-3.1-70B",rep:3,rps:1842,ttft:"52ms",tps:"78 t/s",up:"99.99%",cost:"$8.64/hr",st:"healthy"},
+{name:"Mixtral-8x22B",rep:1,rps:624,ttft:"68ms",tps:"45 t/s",up:"99.98%",cost:"$4.12/hr",st:"healthy"},
+{name:"Mistral-7B-v0.3",rep:1,rps:2105,ttft:"18ms",tps:"142 t/s",up:"100%",cost:"$2.88/hr",st:"healthy"},
+{name:"CodeLlama-34B",rep:1,rps:388,ttft:"41ms",tps:"92 t/s",up:"99.97%",cost:"$4.12/hr",st:"scaling"}
 ];
 
-const COST_BREAKDOWN=[
-{name:"GPU Compute",value:68,color:C.accent},
-{name:"Networking",value:12,color:C.cyan},
-{name:"Storage",value:8,color:C.purple},
-{name:"CPU/RAM",value:7,color:C.orange},
-{name:"Egress",value:5,color:C.green},
-];
+var COSTS=[{name:"GPU Compute",value:68,color:C.ac},{name:"Networking",value:12,color:C.cy},{name:"Storage",value:8,color:C.pu},{name:"CPU/RAM",value:7,color:C.or},{name:"Egress",value:5,color:C.gn}];
 
-const StatusDot=({status})=>{
-const color=status==="active"||status==="healthy"?C.green:status==="scaling"||status==="draining"?C.orange:status==="idle"?C.textMuted:C.red;
-return React.createElement("span",{style:{display:"inline-block",width:7,height:7,borderRadius:"50%",background:color,boxShadow:`0 0 6px ${color}40`,marginRight:6,verticalAlign:"middle"}});
-};
+function Dot(p){var c=p.status==="active"||p.status==="healthy"?C.gn:p.status==="scaling"||p.status==="draining"?C.or:p.status==="idle"?C.tm:C.rd;
+return e("span",{style:{display:"inline-block",width:7,height:7,borderRadius:"50%",background:c,boxShadow:"0 0 6px "+c+"40",marginRight:6,verticalAlign:"middle"}})}
 
-const MetricCard=({label,value,unit,change,changeDir,color=C.text,sub})=>
-React.createElement("div",{style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"18px 20px",display:"flex",flexDirection:"column",gap:4}},
-  React.createElement("div",{style:{fontSize:11,color:C.textDim,fontFamily:"'IBM Plex Mono',monospace",letterSpacing:.5}},label),
-  React.createElement("div",{style:{display:"flex",alignItems:"baseline",gap:6}},
-    React.createElement("span",{style:{fontSize:28,fontWeight:700,color,fontFamily:"'Outfit',sans-serif",letterSpacing:-1}},value),
-    unit&&React.createElement("span",{style:{fontSize:13,color:C.textDim}},unit)
-  ),
-  change&&React.createElement("div",{style:{fontSize:11,fontFamily:"'IBM Plex Mono',monospace",color:changeDir==="up"?C.green:changeDir==="down"?C.red:C.textDim}},changeDir==="up"?"▲":changeDir==="down"?"▼":"–"," ",change),
-  sub&&React.createElement("div",{style:{fontSize:11,color:C.textMuted,marginTop:2}},sub)
-);
+function GBar(p){return e("div",{style:{width:"100%",height:5,background:C.sf3,borderRadius:3,overflow:"hidden"}},
+e("div",{style:{width:Math.min(p.value,100)+"%",height:"100%",borderRadius:3,background:p.value>85?C.rd:p.value>60?p.color:C.tm,transition:"width .5s ease"}}))}
 
-const GpuBar=({value,max=100,color})=>
-React.createElement("div",{style:{width:"100%",height:5,background:C.surface3,borderRadius:3,overflow:"hidden"}},
-  React.createElement("div",{style:{width:`${Math.min(value,max)}%`,height:"100%",borderRadius:3,background:value>85?C.red:value>60?color:C.textMuted,transition:"width .5s ease"}})
-);
+function MC(p){return e("div",{style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:10,padding:"18px 20px",display:"flex",flexDirection:"column",gap:4}},
+e("div",{style:{fontSize:11,color:C.td,fontFamily:"'IBM Plex Mono',monospace",letterSpacing:.5}},p.label),
+e("div",{style:{display:"flex",alignItems:"baseline",gap:6}},
+e("span",{style:{fontSize:28,fontWeight:700,color:p.color||C.tx,fontFamily:"'Outfit',sans-serif",letterSpacing:-1}},p.value),
+p.unit?e("span",{style:{fontSize:13,color:C.td}},p.unit):null),
+p.change?e("div",{style:{fontSize:11,fontFamily:"'IBM Plex Mono',monospace",color:p.dir==="up"?C.gn:p.dir==="down"?C.rd:C.td}},(p.dir==="up"?"\u25B2":p.dir==="down"?"\u25BC":"\u2013")+" "+p.change):null,
+p.sub?e("div",{style:{fontSize:11,color:C.tm,marginTop:2}},p.sub):null)}
 
-const SectionTitle=({children,icon})=>
-React.createElement("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:16,marginTop:32}},
-  React.createElement("span",{style:{fontSize:16}},icon),
-  React.createElement("span",{style:{fontSize:13,fontWeight:600,color:C.text,fontFamily:"'IBM Plex Mono',monospace",letterSpacing:.5,textTransform:"uppercase"}},children),
-  React.createElement("div",{style:{flex:1,height:1,background:C.border}})
-);
+function ST(p){return e("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:16,marginTop:32}},
+e("span",{style:{fontSize:16}},p.icon),
+e("span",{style:{fontSize:13,fontWeight:600,color:C.tx,fontFamily:"'IBM Plex Mono',monospace",letterSpacing:.5,textTransform:"uppercase"}},p.children),
+e("div",{style:{flex:1,height:1,background:C.bd}}))}
 
-const CustomTooltip=({active,payload,label})=>{
-if(!active||!payload||!payload.length)return null;
-return React.createElement("div",{style:{background:C.surface2,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px 14px",fontSize:12,fontFamily:"'IBM Plex Mono',monospace"}},
-  React.createElement("div",{style:{color:C.textDim,marginBottom:6}},label),
-  payload.map((p,i)=>React.createElement("div",{key:i,style:{color:p.color,padding:"2px 0"}},p.name,": ",React.createElement("span",{style:{fontWeight:600}},typeof p.value==="number"?p.value.toLocaleString():p.value)))
-);
-};
+function TT(p){if(!p.active||!p.payload||!p.payload.length)return null;
+return e("div",{style:{background:C.sf2,border:"1px solid "+C.bd,borderRadius:8,padding:"10px 14px",fontSize:12,fontFamily:"'IBM Plex Mono',monospace"}},
+e("div",{style:{color:C.td,marginBottom:6}},p.label),
+p.payload.map(function(x,i){return e("div",{key:i,style:{color:x.color,padding:"2px 0"}},x.name+": ",e("span",{style:{fontWeight:600}},typeof x.value==="number"?x.value.toLocaleString():x.value))}))}
 
-const Tab=({active,children,onClick})=>
-React.createElement("button",{onClick,style:{padding:"7px 16px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontFamily:"'IBM Plex Mono',monospace",fontWeight:500,background:active?C.accentDim:"transparent",color:active?C.accent:C.textDim,transition:"all .2s"}},children);
+function TabBtn(p){return e("button",{onClick:p.onClick,style:{padding:"7px 16px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontFamily:"'IBM Plex Mono',monospace",fontWeight:500,background:p.active?C.acd:"transparent",color:p.active?C.ac:C.td,transition:"all .2s"}},p.children)}
 
 function App(){
-const[timeRange,setTimeRange]=useState("24h");
-const[activeTab,setActiveTab]=useState("overview");
-const[tick,setTick]=useState(0);
+var _tr=React.useState("24h"),timeRange=_tr[0],setTR=_tr[1];
+var _at=React.useState("overview"),tab=_at[0],setTab=_at[1];
+var _tk=React.useState(0),tick=_tk[0],setTick=_tk[1];
 
-useEffect(()=>{const iv=setInterval(()=>setTick(t=>t+1),5000);return()=>clearInterval(iv)},[]);
+React.useEffect(function(){var iv=setInterval(function(){setTick(function(t){return t+1})},5000);return function(){clearInterval(iv)}},[]);
 
-const hours=timeRange==="1h"?1:timeRange==="6h"?6:timeRange==="24h"?24:72;
-const gpuUtilData=genTS(hours,76,15,.1);
-const latencyData=genLatency(hours);
-const throughputData=genThroughput(hours);
-const errorData=genTS(hours,.12,.08);
-const costData=genTS(hours,19.76,3,0);
-const kvCacheData=genTS(hours,62,18);
+var hrs=timeRange==="1h"?1:timeRange==="6h"?6:timeRange==="24h"?24:72;
+var intv=Math.max(1,Math.floor(hrs/6));
+var gpuD=genTS(hrs,76,15,.1);
+var latD=genLat(hrs);
+var tpD=genTP(hrs);
+var errD=genTS(hrs,.12,.08);
+var costD=genTS(hrs,19.76,3,0);
+var kvD=genTS(hrs,62,18);
 
-const totalRPS=MODEL_DEPLOYMENTS.reduce((s,m)=>s+m.rps,0);
-const activeGPUs=GPU_NODES.filter(g=>g.status==="active").length;
-const avgUtil=Math.round(GPU_NODES.filter(g=>g.status==="active").reduce((s,g)=>s+g.util,0)/activeGPUs);
+var totalRPS=MODELS.reduce(function(s,m){return s+m.rps},0);
+var actGPU=GPUS.filter(function(g){return g.st==="active"}).length;
+var avgU=Math.round(GPUS.filter(function(g){return g.st==="active"}).reduce(function(s,g){return s+g.util},0)/actGPU);
 
-return React.createElement("div",{style:{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:"'Outfit','DM Sans',sans-serif"}},
+return e("div",{style:{minHeight:"100vh",background:C.bg,color:C.tx,fontFamily:"'Outfit',sans-serif"}},
 
-  // Header
-  React.createElement("div",{style:{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"14px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}},
-    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:14}},
-      React.createElement("div",{style:{width:32,height:32,borderRadius:8,background:`linear-gradient(135deg, ${C.accent}, ${C.cyan})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"#fff"}},"DI"),
-      React.createElement("div",null,
-        React.createElement("div",{style:{fontSize:15,fontWeight:600,letterSpacing:-.3}},"Dedicated Inference"),
-        React.createElement("div",{style:{fontSize:11,color:C.textDim,fontFamily:"'IBM Plex Mono',monospace"}},"prod-cluster-us-east-1 · ",React.createElement(StatusDot,{status:"active"}),React.createElement("span",{style:{color:C.green}},"All systems operational"))
-      )
-    ),
-    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
-      ["1h","6h","24h","3d"].map(r=>React.createElement(Tab,{key:r,active:timeRange===r,onClick:()=>setTimeRange(r)},r)),
-      React.createElement("div",{style:{marginLeft:12,padding:"6px 12px",borderRadius:6,background:C.greenDim,color:C.green,fontSize:11,fontFamily:"'IBM Plex Mono',monospace",fontWeight:500,display:"flex",alignItems:"center",gap:6}},
-        React.createElement("span",{style:{width:6,height:6,borderRadius:"50%",background:C.green,animation:"pulse 2s infinite"}}),
-        "LIVE"
-      )
-    )
-  ),
+e("div",{style:{background:C.sf,borderBottom:"1px solid "+C.bd,padding:"14px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100}},
+e("div",{style:{display:"flex",alignItems:"center",gap:14}},
+e("div",{style:{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,"+C.ac+","+C.cy+")",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"#fff"}},"DI"),
+e("div",null,
+e("div",{style:{fontSize:15,fontWeight:600,letterSpacing:-.3}},"Dedicated Inference"),
+e("div",{style:{fontSize:11,color:C.td,fontFamily:"'IBM Plex Mono',monospace"}},"prod-cluster-us-east-1 \u00B7 ",e(Dot,{status:"active"}),e("span",{style:{color:C.gn}},"All systems operational")))),
+e("div",{style:{display:"flex",alignItems:"center",gap:8}},
+["1h","6h","24h","3d"].map(function(r){return e(TabBtn,{key:r,active:timeRange===r,onClick:function(){setTR(r)}},r)}),
+e("div",{style:{marginLeft:12,padding:"6px 12px",borderRadius:6,background:C.gnd,color:C.gn,fontSize:11,fontFamily:"'IBM Plex Mono',monospace",fontWeight:500,display:"flex",alignItems:"center",gap:6}},
+e("span",{style:{width:6,height:6,borderRadius:"50%",background:C.gn,animation:"pulse 2s infinite"}}),
+"LIVE"))),
 
-  // Nav tabs
-  React.createElement("div",{style:{padding:"12px 28px 0",display:"flex",gap:4,borderBottom:`1px solid ${C.border}`,background:C.bg}},
-    [{key:"overview",label:"Overview"},{key:"gpu",label:"GPU Fleet"},{key:"models",label:"Model Deployments"},{key:"costs",label:"Cost & Billing"}].map(tab=>
-      React.createElement("button",{key:tab.key,onClick:()=>setActiveTab(tab.key),style:{padding:"10px 18px",border:"none",cursor:"pointer",fontSize:13,fontWeight:500,background:"transparent",color:activeTab===tab.key?C.text:C.textDim,borderBottom:activeTab===tab.key?`2px solid ${C.accent}`:"2px solid transparent",transition:"all .2s",marginBottom:-1}},tab.label)
-    )
-  ),
+e("div",{style:{padding:"12px 28px 0",display:"flex",gap:4,borderBottom:"1px solid "+C.bd,background:C.bg}},
+[{k:"overview",l:"Overview"},{k:"gpu",l:"GPU Fleet"},{k:"models",l:"Model Deployments"},{k:"costs",l:"Cost & Billing"}].map(function(t){
+return e("button",{key:t.k,onClick:function(){setTab(t.k)},style:{padding:"10px 18px",border:"none",cursor:"pointer",fontSize:13,fontWeight:500,background:"transparent",color:tab===t.k?C.tx:C.td,borderBottom:tab===t.k?"2px solid "+C.ac:"2px solid transparent",transition:"all .2s",marginBottom:-1}},t.l)})),
 
-  // Content
-  React.createElement("div",{style:{padding:"24px 28px 60px",maxWidth:1400,margin:"0 auto"}},
+e("div",{style:{padding:"24px 28px 60px",maxWidth:1400,margin:"0 auto"}},
 
-    // KPI Row
-    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))",gap:12,marginBottom:8}},
-      React.createElement(MetricCard,{label:"TOTAL RPS",value:totalRPS.toLocaleString(),change:"+12.3% vs yesterday",changeDir:"up",color:C.accent}),
-      React.createElement(MetricCard,{label:"P95 LATENCY",value:"118",unit:"ms",change:"-8ms vs avg",changeDir:"up",color:C.green}),
-      React.createElement(MetricCard,{label:"GPU UTILIZATION",value:`${avgUtil}%`,change:"Across 6 active GPUs",color:avgUtil>80?C.orange:C.green}),
-      React.createElement(MetricCard,{label:"ACTIVE GPUS",value:`${activeGPUs}/${GPU_NODES.length}`,sub:"1 idle · 1 draining",color:C.cyan}),
-      React.createElement(MetricCard,{label:"TOKENS / SEC",value:"142K",change:"+18K vs yesterday",changeDir:"up",color:C.purple}),
-      React.createElement(MetricCard,{label:"ERROR RATE",value:"0.04",unit:"%",change:"Below 0.1% SLA",changeDir:"up",color:C.green}),
-      React.createElement(MetricCard,{label:"HOURLY COST",value:"$19.76",change:"+$1.20 (scaling event)",changeDir:"down",color:C.orange}),
-      React.createElement(MetricCard,{label:"UPTIME (30d)",value:"99.99",unit:"%",sub:"2m 37s downtime total",color:C.green})
-    ),
+e("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))",gap:12,marginBottom:8}},
+e(MC,{label:"TOTAL RPS",value:totalRPS.toLocaleString(),change:"+12.3% vs yesterday",dir:"up",color:C.ac}),
+e(MC,{label:"P95 LATENCY",value:"118",unit:"ms",change:"-8ms vs avg",dir:"up",color:C.gn}),
+e(MC,{label:"GPU UTILIZATION",value:avgU+"%",change:"Across 6 active GPUs",color:avgU>80?C.or:C.gn}),
+e(MC,{label:"ACTIVE GPUS",value:actGPU+"/"+GPUS.length,sub:"1 idle \u00B7 1 draining",color:C.cy}),
+e(MC,{label:"TOKENS / SEC",value:"142K",change:"+18K vs yesterday",dir:"up",color:C.pu}),
+e(MC,{label:"ERROR RATE",value:"0.04",unit:"%",change:"Below 0.1% SLA",dir:"up",color:C.gn}),
+e(MC,{label:"HOURLY COST",value:"$19.76",change:"+$1.20 (scaling event)",dir:"down",color:C.or}),
+e(MC,{label:"UPTIME (30d)",value:"99.99",unit:"%",sub:"2m 37s downtime total",color:C.gn})),
 
-    // Overview tab
-    activeTab==="overview"&&React.createElement(React.Fragment,null,
-      React.createElement(SectionTitle,{icon:"📈"},"Throughput"),
-      React.createElement("div",{className:"chart-card",style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"20px 20px 12px",marginBottom:16}},
-        React.createElement("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:12}},
-          React.createElement("span",{style:{fontSize:13,fontWeight:500}},"Requests per Second"),
-          React.createElement("span",{style:{fontSize:12,color:C.textDim,fontFamily:"'IBM Plex Mono',monospace"}},"Peak: 4,812 RPS")
-        ),
-        React.createElement(ResponsiveContainer,{width:"100%",height:200},
-          React.createElement(AreaChart,{data:throughputData},
-            React.createElement("defs",null,React.createElement("linearGradient",{id:"rpsGrad",x1:0,y1:0,x2:0,y2:1},React.createElement("stop",{offset:"0%",stopColor:C.accent,stopOpacity:.3}),React.createElement("stop",{offset:"100%",stopColor:C.accent,stopOpacity:0}))),
-            React.createElement(XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,interval:Math.floor(hours/6)}),
-            React.createElement(YAxis,{tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,width:45}),
-            React.createElement(Tooltip,{content:React.createElement(CustomTooltip)}),
-            React.createElement(Area,{type:"monotone",dataKey:"rps",stroke:C.accent,fill:"url(#rpsGrad)",strokeWidth:1.5,name:"RPS",dot:false})
-          )
-        )
-      ),
+tab==="overview"?e(React.Fragment,null,
+e(ST,{icon:"\uD83D\uDCC8"},"Throughput"),
+e("div",{className:"fade",style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:12,padding:"20px 20px 12px",marginBottom:16}},
+e("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:12}},
+e("span",{style:{fontSize:13,fontWeight:500}},"Requests per Second"),
+e("span",{style:{fontSize:12,color:C.td,fontFamily:"'IBM Plex Mono',monospace"}},"Peak: 4,812 RPS")),
+e(RC.ResponsiveContainer,{width:"100%",height:200},
+e(RC.AreaChart,{data:tpD},
+e("defs",null,e("linearGradient",{id:"rg",x1:0,y1:0,x2:0,y2:1},e("stop",{offset:"0%",stopColor:C.ac,stopOpacity:.3}),e("stop",{offset:"100%",stopColor:C.ac,stopOpacity:0}))),
+e(RC.XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,interval:intv}),
+e(RC.YAxis,{tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,width:45}),
+e(RC.Tooltip,{content:e(TT)}),
+e(RC.Area,{type:"monotone",dataKey:"rps",stroke:C.ac,fill:"url(#rg)",strokeWidth:1.5,name:"RPS",dot:false})))),
 
-      // Latency + GPU row
-      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}},
-        React.createElement("div",{className:"chart-card",style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"20px 20px 12px"}},
-          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:12}},"Latency Distribution"),
-          React.createElement(ResponsiveContainer,{width:"100%",height:180},
-            React.createElement(LineChart,{data:latencyData},
-              React.createElement(XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,interval:Math.floor(hours/6)}),
-              React.createElement(YAxis,{tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,width:35,unit:"ms"}),
-              React.createElement(Tooltip,{content:React.createElement(CustomTooltip)}),
-              React.createElement(Line,{type:"monotone",dataKey:"p50",stroke:C.green,strokeWidth:1.5,dot:false,name:"p50"}),
-              React.createElement(Line,{type:"monotone",dataKey:"p95",stroke:C.orange,strokeWidth:1.5,dot:false,name:"p95"}),
-              React.createElement(Line,{type:"monotone",dataKey:"p99",stroke:C.red,strokeWidth:1.5,dot:false,name:"p99"})
-            )
-          ),
-          React.createElement("div",{style:{display:"flex",gap:16,justifyContent:"center",marginTop:4}},
-            [{label:"p50",color:C.green},{label:"p95",color:C.orange},{label:"p99",color:C.red}].map(l=>
-              React.createElement("div",{key:l.label,style:{display:"flex",alignItems:"center",gap:5,fontSize:11,color:C.textDim}},
-                React.createElement("span",{style:{width:10,height:2,background:l.color,borderRadius:1}}),l.label
-              )
-            )
-          )
-        ),
-        React.createElement("div",{className:"chart-card",style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"20px 20px 12px"}},
-          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:12}},"GPU Utilization (Cluster Avg)"),
-          React.createElement(ResponsiveContainer,{width:"100%",height:180},
-            React.createElement(AreaChart,{data:gpuUtilData},
-              React.createElement("defs",null,React.createElement("linearGradient",{id:"gpuGrad",x1:0,y1:0,x2:0,y2:1},React.createElement("stop",{offset:"0%",stopColor:C.cyan,stopOpacity:.25}),React.createElement("stop",{offset:"100%",stopColor:C.cyan,stopOpacity:0}))),
-              React.createElement(XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,interval:Math.floor(hours/6)}),
-              React.createElement(YAxis,{tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,width:35,domain:[0,100],unit:"%"}),
-              React.createElement(Tooltip,{content:React.createElement(CustomTooltip)}),
-              React.createElement(Area,{type:"monotone",dataKey:"value",stroke:C.cyan,fill:"url(#gpuGrad)",strokeWidth:1.5,name:"GPU %",dot:false})
-            )
-          )
-        )
-      ),
+e("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}},
+e("div",{className:"fade",style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:12,padding:"20px 20px 12px"}},
+e("div",{style:{fontSize:13,fontWeight:500,marginBottom:12}},"Latency Distribution"),
+e(RC.ResponsiveContainer,{width:"100%",height:180},
+e(RC.LineChart,{data:latD},
+e(RC.XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,interval:intv}),
+e(RC.YAxis,{tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,width:35,unit:"ms"}),
+e(RC.Tooltip,{content:e(TT)}),
+e(RC.Line,{type:"monotone",dataKey:"p50",stroke:C.gn,strokeWidth:1.5,dot:false,name:"p50"}),
+e(RC.Line,{type:"monotone",dataKey:"p95",stroke:C.or,strokeWidth:1.5,dot:false,name:"p95"}),
+e(RC.Line,{type:"monotone",dataKey:"p99",stroke:C.rd,strokeWidth:1.5,dot:false,name:"p99"}))),
+e("div",{style:{display:"flex",gap:16,justifyContent:"center",marginTop:4}},
+[{l:"p50",c:C.gn},{l:"p95",c:C.or},{l:"p99",c:C.rd}].map(function(x){return e("div",{key:x.l,style:{display:"flex",alignItems:"center",gap:5,fontSize:11,color:C.td}},e("span",{style:{width:10,height:2,background:x.c,borderRadius:1}}),x.l)}))),
 
-      // Error + KV Cache row
-      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},
-        React.createElement("div",{className:"chart-card",style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"20px 20px 12px"}},
-          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:12}},
-            React.createElement("span",{style:{fontSize:13,fontWeight:500}},"Error Rate"),
-            React.createElement("span",{style:{fontSize:10,fontFamily:"'IBM Plex Mono',monospace",padding:"3px 8px",borderRadius:4,background:C.greenDim,color:C.green}},"WITHIN SLA")
-          ),
-          React.createElement(ResponsiveContainer,{width:"100%",height:160},
-            React.createElement(AreaChart,{data:errorData},
-              React.createElement("defs",null,React.createElement("linearGradient",{id:"errGrad",x1:0,y1:0,x2:0,y2:1},React.createElement("stop",{offset:"0%",stopColor:C.red,stopOpacity:.2}),React.createElement("stop",{offset:"100%",stopColor:C.red,stopOpacity:0}))),
-              React.createElement(XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,interval:Math.floor(hours/6)}),
-              React.createElement(YAxis,{tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,width:35,unit:"%"}),
-              React.createElement(Tooltip,{content:React.createElement(CustomTooltip)}),
-              React.createElement(Area,{type:"monotone",dataKey:"value",stroke:C.red,fill:"url(#errGrad)",strokeWidth:1.5,name:"Error %",dot:false})
-            )
-          )
-        ),
-        React.createElement("div",{className:"chart-card",style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"20px 20px 12px"}},
-          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:12}},"KV Cache Utilization"),
-          React.createElement(ResponsiveContainer,{width:"100%",height:160},
-            React.createElement(AreaChart,{data:kvCacheData},
-              React.createElement("defs",null,React.createElement("linearGradient",{id:"kvGrad",x1:0,y1:0,x2:0,y2:1},React.createElement("stop",{offset:"0%",stopColor:C.purple,stopOpacity:.25}),React.createElement("stop",{offset:"100%",stopColor:C.purple,stopOpacity:0}))),
-              React.createElement(XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,interval:Math.floor(hours/6)}),
-              React.createElement(YAxis,{tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,width:35,domain:[0,100],unit:"%"}),
-              React.createElement(Tooltip,{content:React.createElement(CustomTooltip)}),
-              React.createElement(Area,{type:"monotone",dataKey:"value",stroke:C.purple,fill:"url(#kvGrad)",strokeWidth:1.5,name:"KV Cache %",dot:false})
-            )
-          )
-        )
-      )
-    ),
+e("div",{className:"fade",style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:12,padding:"20px 20px 12px"}},
+e("div",{style:{fontSize:13,fontWeight:500,marginBottom:12}},"GPU Utilization (Cluster Avg)"),
+e(RC.ResponsiveContainer,{width:"100%",height:180},
+e(RC.AreaChart,{data:gpuD},
+e("defs",null,e("linearGradient",{id:"gg",x1:0,y1:0,x2:0,y2:1},e("stop",{offset:"0%",stopColor:C.cy,stopOpacity:.25}),e("stop",{offset:"100%",stopColor:C.cy,stopOpacity:0}))),
+e(RC.XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,interval:intv}),
+e(RC.YAxis,{tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,width:35,domain:[0,100],unit:"%"}),
+e(RC.Tooltip,{content:e(TT)}),
+e(RC.Area,{type:"monotone",dataKey:"value",stroke:C.cy,fill:"url(#gg)",strokeWidth:1.5,name:"GPU %",dot:false}))))),
 
-    // GPU tab
-    activeTab==="gpu"&&React.createElement(React.Fragment,null,
-      React.createElement(SectionTitle,{icon:"🖥️"},"GPU Fleet Status"),
-      React.createElement("div",{style:{overflowX:"auto"}},
-        React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:13}},
-          React.createElement("thead",null,
-            React.createElement("tr",{style:{borderBottom:`1px solid ${C.border}`}},
-              ["Node","GPU Type","Status","Model","Utilization","Memory","VRAM","Temp","Power"].map(h=>
-                React.createElement("th",{key:h,style:{padding:"12px 14px",textAlign:"left",fontSize:10,fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1,color:C.textMuted,textTransform:"uppercase",fontWeight:500}},h)
-              )
-            )
-          ),
-          React.createElement("tbody",null,
-            GPU_NODES.map((gpu,i)=>
-              React.createElement("tr",{key:gpu.id,style:{borderBottom:`1px solid ${C.border}`,background:i%2===0?"transparent":C.surface}},
-                React.createElement("td",{style:{padding:"14px",fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:C.accent}},gpu.id),
-                React.createElement("td",{style:{padding:"14px"}},
-                  React.createElement("span",{style:{padding:"3px 8px",borderRadius:4,fontSize:11,background:gpu.type.includes("H100")?C.purpleDim:C.cyanDim,color:gpu.type.includes("H100")?C.purple:C.cyan,fontFamily:"'IBM Plex Mono',monospace"}},gpu.type)
-                ),
-                React.createElement("td",{style:{padding:"14px"}},React.createElement(StatusDot,{status:gpu.status}),React.createElement("span",{style:{fontSize:12}},gpu.status)),
-                React.createElement("td",{style:{padding:"14px",fontWeight:500,fontSize:12}},gpu.model),
-                React.createElement("td",{style:{padding:"14px",width:140}},
-                  React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
-                    React.createElement(GpuBar,{value:gpu.util,color:C.cyan}),
-                    React.createElement("span",{style:{fontSize:11,fontFamily:"'IBM Plex Mono',monospace",color:C.textDim,minWidth:32}},gpu.util+"%")
-                  )
-                ),
-                React.createElement("td",{style:{padding:"14px",width:140}},
-                  React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
-                    React.createElement(GpuBar,{value:gpu.mem,color:C.purple}),
-                    React.createElement("span",{style:{fontSize:11,fontFamily:"'IBM Plex Mono',monospace",color:C.textDim,minWidth:32}},gpu.mem+"%")
-                  )
-                ),
-                React.createElement("td",{style:{padding:"14px",fontFamily:"'IBM Plex Mono',monospace",fontSize:11,color:C.textDim}},gpu.vram),
-                React.createElement("td",{style:{padding:"14px",fontFamily:"'IBM Plex Mono',monospace",fontSize:11,color:gpu.temp>70?C.orange:C.textDim}},gpu.temp+"°C"),
-                React.createElement("td",{style:{padding:"14px",fontFamily:"'IBM Plex Mono',monospace",fontSize:11,color:C.textDim}},gpu.power)
-              )
-            )
-          )
-        )
-      ),
+e("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},
+e("div",{className:"fade",style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:12,padding:"20px 20px 12px"}},
+e("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:12}},
+e("span",{style:{fontSize:13,fontWeight:500}},"Error Rate"),
+e("span",{style:{fontSize:10,fontFamily:"'IBM Plex Mono',monospace",padding:"3px 8px",borderRadius:4,background:C.gnd,color:C.gn}},"WITHIN SLA")),
+e(RC.ResponsiveContainer,{width:"100%",height:160},
+e(RC.AreaChart,{data:errD},
+e("defs",null,e("linearGradient",{id:"eg",x1:0,y1:0,x2:0,y2:1},e("stop",{offset:"0%",stopColor:C.rd,stopOpacity:.2}),e("stop",{offset:"100%",stopColor:C.rd,stopOpacity:0}))),
+e(RC.XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,interval:intv}),
+e(RC.YAxis,{tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,width:35,unit:"%"}),
+e(RC.Tooltip,{content:e(TT)}),
+e(RC.Area,{type:"monotone",dataKey:"value",stroke:C.rd,fill:"url(#eg)",strokeWidth:1.5,name:"Error %",dot:false})))),
 
-      React.createElement(SectionTitle,{icon:"📊"},"GPU Utilization Heatmap"),
-      React.createElement("div",{style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:24,display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:12}},
-        GPU_NODES.map(gpu=>
-          React.createElement("div",{key:gpu.id,style:{background:C.surface2,borderRadius:10,padding:16,border:`1px solid ${gpu.util>85?C.red+"40":gpu.util>60?C.cyan+"30":C.border}`}},
-            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:10}},
-              React.createElement("span",{style:{fontSize:11,fontFamily:"'IBM Plex Mono',monospace",color:C.textDim}},gpu.id),
-              React.createElement(StatusDot,{status:gpu.status})
-            ),
-            React.createElement("div",{style:{fontSize:32,fontWeight:700,fontFamily:"'Outfit',sans-serif",color:gpu.util>85?C.red:gpu.util>60?C.cyan:C.textMuted,letterSpacing:-1,lineHeight:1}},gpu.util+"%"),
-            React.createElement("div",{style:{fontSize:10,color:C.textMuted,marginTop:6}},gpu.type+" · "+gpu.temp+"°C"),
-            React.createElement(GpuBar,{value:gpu.util,color:C.cyan})
-          )
-        )
-      )
-    ),
+e("div",{className:"fade",style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:12,padding:"20px 20px 12px"}},
+e("div",{style:{fontSize:13,fontWeight:500,marginBottom:12}},"KV Cache Utilization"),
+e(RC.ResponsiveContainer,{width:"100%",height:160},
+e(RC.AreaChart,{data:kvD},
+e("defs",null,e("linearGradient",{id:"kg",x1:0,y1:0,x2:0,y2:1},e("stop",{offset:"0%",stopColor:C.pu,stopOpacity:.25}),e("stop",{offset:"100%",stopColor:C.pu,stopOpacity:0}))),
+e(RC.XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,interval:intv}),
+e(RC.YAxis,{tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,width:35,domain:[0,100],unit:"%"}),
+e(RC.Tooltip,{content:e(TT)}),
+e(RC.Area,{type:"monotone",dataKey:"value",stroke:C.pu,fill:"url(#kg)",strokeWidth:1.5,name:"KV Cache %",dot:false})))))
+):null,
 
-    // Models tab
-    activeTab==="models"&&React.createElement(React.Fragment,null,
-      React.createElement(SectionTitle,{icon:"🤖"},"Active Model Deployments"),
-      React.createElement("div",{style:{display:"grid",gap:12}},
-        MODEL_DEPLOYMENTS.map(m=>
-          React.createElement("div",{key:m.name,style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"20px 24px",display:"grid",gridTemplateColumns:"240px repeat(5, 1fr) auto",alignItems:"center",gap:16}},
-            React.createElement("div",null,
-              React.createElement("div",{style:{fontWeight:600,fontSize:15}},m.name),
-              React.createElement("div",{style:{fontSize:11,color:C.textDim,marginTop:4}},m.replicas+" replica"+(m.replicas>1?"s":"")+" · ",React.createElement(StatusDot,{status:m.status}),m.status)
-            ),
-            ...[{v:m.rps.toLocaleString(),l:"RPS",c:C.accent},{v:m.ttft,l:"TTFT",c:C.green},{v:m.tps,l:"Throughput",c:C.purple},{v:m.uptime,l:"Uptime",c:C.green},{v:m.cost,l:"Cost",c:C.orange}].map((d,i)=>
-              React.createElement("div",{key:i,style:{textAlign:"center"}},
-                React.createElement("div",{style:{fontSize:18,fontWeight:700,color:d.c}},d.v),
-                React.createElement("div",{style:{fontSize:10,color:C.textMuted}},d.l)
-              )
-            ),
-            React.createElement("button",{style:{padding:"8px 16px",borderRadius:6,border:`1px solid ${C.border}`,background:C.surface2,color:C.textDim,fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace"}},"Details →")
-          )
-        )
-      ),
+tab==="gpu"?e(React.Fragment,null,
+e(ST,{icon:"\uD83D\uDDA5\uFE0F"},"GPU Fleet Status"),
+e("div",{style:{overflowX:"auto"}},
+e("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:13}},
+e("thead",null,e("tr",{style:{borderBottom:"1px solid "+C.bd}},
+["Node","GPU Type","Status","Model","Utilization","Memory","VRAM","Temp","Power"].map(function(h){return e("th",{key:h,style:{padding:"12px 14px",textAlign:"left",fontSize:10,fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1,color:C.tm,textTransform:"uppercase",fontWeight:500}},h)}))),
+e("tbody",null,GPUS.map(function(g,i){return e("tr",{key:g.id,style:{borderBottom:"1px solid "+C.bd,background:i%2===0?"transparent":C.sf}},
+e("td",{style:{padding:14,fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:C.ac}},g.id),
+e("td",{style:{padding:14}},e("span",{style:{padding:"3px 8px",borderRadius:4,fontSize:11,background:g.type.indexOf("H100")>-1?C.pud:C.cyd,color:g.type.indexOf("H100")>-1?C.pu:C.cy,fontFamily:"'IBM Plex Mono',monospace"}},g.type)),
+e("td",{style:{padding:14}},e(Dot,{status:g.st}),e("span",{style:{fontSize:12}},g.st)),
+e("td",{style:{padding:14,fontWeight:500,fontSize:12}},g.model),
+e("td",{style:{padding:14,width:140}},e("div",{style:{display:"flex",alignItems:"center",gap:8}},e(GBar,{value:g.util,color:C.cy}),e("span",{style:{fontSize:11,fontFamily:"'IBM Plex Mono',monospace",color:C.td,minWidth:32}},g.util+"%"))),
+e("td",{style:{padding:14,width:140}},e("div",{style:{display:"flex",alignItems:"center",gap:8}},e(GBar,{value:g.mem,color:C.pu}),e("span",{style:{fontSize:11,fontFamily:"'IBM Plex Mono',monospace",color:C.td,minWidth:32}},g.mem+"%"))),
+e("td",{style:{padding:14,fontFamily:"'IBM Plex Mono',monospace",fontSize:11,color:C.td}},g.vram),
+e("td",{style:{padding:14,fontFamily:"'IBM Plex Mono',monospace",fontSize:11,color:g.temp>70?C.or:C.td}},g.temp+"\u00B0C"),
+e("td",{style:{padding:14,fontFamily:"'IBM Plex Mono',monospace",fontSize:11,color:C.td}},g.pw))})))),
 
-      React.createElement(SectionTitle,{icon:"⚡"},"Inference Performance Benchmarks"),
-      React.createElement("div",{style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:24}},
-        React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:13}},
-          React.createElement("thead",null,
-            React.createElement("tr",{style:{borderBottom:`1px solid ${C.border}`}},
-              ["Model","Batch","Input Tok","Output Tok","TTFT","TPS","ITL","GPU Mem"].map(h=>
-                React.createElement("th",{key:h,style:{padding:"10px 12px",textAlign:"left",fontSize:10,fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1,color:C.textMuted,textTransform:"uppercase"}},h)
-              )
-            )
-          ),
-          React.createElement("tbody",null,
-            [["Llama-3.1-70B","32","2048","512","52ms","78 t/s","12.8ms","57 GB"],["Llama-3.1-70B","1","512","256","28ms","112 t/s","8.9ms","54 GB"],["Mixtral-8x22B","16","4096","1024","68ms","45 t/s","22.2ms","71 GB"],["Mistral-7B-v0.3","64","2048","512","18ms","142 t/s","7.0ms","14 GB"],["CodeLlama-34B","8","8192","2048","41ms","92 t/s","10.8ms","44 GB"]].map((row,i)=>
-              React.createElement("tr",{key:i,style:{borderBottom:`1px solid ${C.border}`}},
-                row.map((cell,j)=>
-                  React.createElement("td",{key:j,style:{padding:"12px",fontFamily:j>0?"'IBM Plex Mono',monospace":"inherit",fontSize:j>0?12:13,fontWeight:j===0?500:400,color:j===0?C.text:C.textDim}},cell)
-                )
-              )
-            )
-          )
-        )
-      )
-    ),
+e(ST,{icon:"\uD83D\uDCCA"},"GPU Utilization Heatmap"),
+e("div",{style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:12,padding:24,display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:12}},
+GPUS.map(function(g){return e("div",{key:g.id,style:{background:C.sf2,borderRadius:10,padding:16,border:"1px solid "+(g.util>85?C.rd+"40":g.util>60?C.cy+"30":C.bd)}},
+e("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:10}},
+e("span",{style:{fontSize:11,fontFamily:"'IBM Plex Mono',monospace",color:C.td}},g.id),
+e(Dot,{status:g.st})),
+e("div",{style:{fontSize:32,fontWeight:700,fontFamily:"'Outfit',sans-serif",color:g.util>85?C.rd:g.util>60?C.cy:C.tm,letterSpacing:-1,lineHeight:1}},g.util+"%"),
+e("div",{style:{fontSize:10,color:C.tm,marginTop:6}},g.type+" \u00B7 "+g.temp+"\u00B0C"),
+e(GBar,{value:g.util,color:C.cy}))}))
+):null,
 
-    // Costs tab
-    activeTab==="costs"&&React.createElement(React.Fragment,null,
-      React.createElement(SectionTitle,{icon:"💰"},"Cost Breakdown"),
-      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},
-        React.createElement("div",{style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:24}},
-          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:16}},"Cost per Hour (Trend)"),
-          React.createElement(ResponsiveContainer,{width:"100%",height:200},
-            React.createElement(AreaChart,{data:costData},
-              React.createElement("defs",null,React.createElement("linearGradient",{id:"costGrad",x1:0,y1:0,x2:0,y2:1},React.createElement("stop",{offset:"0%",stopColor:C.orange,stopOpacity:.25}),React.createElement("stop",{offset:"100%",stopColor:C.orange,stopOpacity:0}))),
-              React.createElement(XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,interval:Math.floor(hours/6)}),
-              React.createElement(YAxis,{tick:{fontSize:10,fill:C.textMuted},tickLine:false,axisLine:false,width:40,unit:"$"}),
-              React.createElement(Tooltip,{content:React.createElement(CustomTooltip)}),
-              React.createElement(Area,{type:"monotone",dataKey:"value",stroke:C.orange,fill:"url(#costGrad)",strokeWidth:1.5,name:"$/hr",dot:false})
-            )
-          )
-        ),
-        React.createElement("div",{style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:24}},
-          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:16}},"Cost Distribution"),
-          React.createElement("div",{style:{display:"flex",alignItems:"center",gap:24}},
-            React.createElement(ResponsiveContainer,{width:"50%",height:200},
-              React.createElement(PieChart,null,
-                React.createElement(Pie,{data:COST_BREAKDOWN,cx:"50%",cy:"50%",innerRadius:50,outerRadius:80,dataKey:"value",strokeWidth:0},
-                  COST_BREAKDOWN.map((e,i)=>React.createElement(Cell,{key:i,fill:e.color}))
-                )
-              )
-            ),
-            React.createElement("div",{style:{flex:1}},
-              COST_BREAKDOWN.map(item=>
-                React.createElement("div",{key:item.name,style:{display:"flex",alignItems:"center",gap:8,padding:"6px 0",fontSize:13}},
-                  React.createElement("span",{style:{width:10,height:10,borderRadius:3,background:item.color,flexShrink:0}}),
-                  React.createElement("span",{style:{flex:1,color:C.textDim}},item.name),
-                  React.createElement("span",{style:{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,fontWeight:500}},item.value+"%")
-                )
-              )
-            )
-          )
-        )
-      ),
+tab==="models"?e(React.Fragment,null,
+e(ST,{icon:"\uD83E\uDD16"},"Active Model Deployments"),
+e("div",{style:{display:"grid",gap:12}},MODELS.map(function(m){
+return e("div",{key:m.name,style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:12,padding:"20px 24px",display:"grid",gridTemplateColumns:"240px repeat(5, 1fr) auto",alignItems:"center",gap:16}},
+e("div",null,e("div",{style:{fontWeight:600,fontSize:15}},m.name),e("div",{style:{fontSize:11,color:C.td,marginTop:4}},m.rep+" replica"+(m.rep>1?"s":"")+" \u00B7 ",e(Dot,{status:m.st}),m.st)),
+[{v:m.rps.toLocaleString(),l:"RPS",c:C.ac},{v:m.ttft,l:"TTFT",c:C.gn},{v:m.tps,l:"Throughput",c:C.pu},{v:m.up,l:"Uptime",c:C.gn},{v:m.cost,l:"Cost",c:C.or}].map(function(d,i){return e("div",{key:i,style:{textAlign:"center"}},e("div",{style:{fontSize:18,fontWeight:700,color:d.c}},d.v),e("div",{style:{fontSize:10,color:C.tm}},d.l))}),
+e("button",{style:{padding:"8px 16px",borderRadius:6,border:"1px solid "+C.bd,background:C.sf2,color:C.td,fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace"}},"Details \u2192"))})),
 
-      React.createElement(SectionTitle,{icon:"📊"},"Cost Efficiency Metrics"),
-      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:12}},
-        React.createElement(MetricCard,{label:"COST / 1M TOKENS",value:"$0.42",change:"-$0.08 vs last week",changeDir:"up",color:C.green}),
-        React.createElement(MetricCard,{label:"COST / 1K REQUESTS",value:"$0.87",change:"-12% optimized",changeDir:"up",color:C.green}),
-        React.createElement(MetricCard,{label:"GPU IDLE WASTE",value:"$2.14",unit:"/hr",change:"11% of total spend",changeDir:"down",color:C.red}),
-        React.createElement(MetricCard,{label:"MONTHLY PROJECTED",value:"$14,227",change:"Based on current usage",color:C.accent})
-      ),
+e(ST,{icon:"\u26A1"},"Inference Performance Benchmarks"),
+e("div",{style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:12,padding:24}},
+e("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:13}},
+e("thead",null,e("tr",{style:{borderBottom:"1px solid "+C.bd}},
+["Model","Batch","Input Tok","Output Tok","TTFT","TPS","ITL","GPU Mem"].map(function(h){return e("th",{key:h,style:{padding:"10px 12px",textAlign:"left",fontSize:10,fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1,color:C.tm,textTransform:"uppercase"}},h)}))),
+e("tbody",null,
+[["Llama-3.1-70B","32","2048","512","52ms","78 t/s","12.8ms","57 GB"],["Llama-3.1-70B","1","512","256","28ms","112 t/s","8.9ms","54 GB"],["Mixtral-8x22B","16","4096","1024","68ms","45 t/s","22.2ms","71 GB"],["Mistral-7B-v0.3","64","2048","512","18ms","142 t/s","7.0ms","14 GB"],["CodeLlama-34B","8","8192","2048","41ms","92 t/s","10.8ms","44 GB"]].map(function(r,i){return e("tr",{key:i,style:{borderBottom:"1px solid "+C.bd}},r.map(function(c,j){return e("td",{key:j,style:{padding:12,fontFamily:j>0?"'IBM Plex Mono',monospace":"inherit",fontSize:j>0?12:13,fontWeight:j===0?500:400,color:j===0?C.tx:C.td}},c)}))}))))
+):null,
 
-      React.createElement(SectionTitle,{icon:"💡"},"Optimization Recommendations"),
-      React.createElement("div",{style:{display:"grid",gap:10}},
-        [{severity:"high",saving:"$840/mo",desc:"gpu-h100-03 has been idle for 6+ hours. Consider scale-to-zero policy or reassigning to a queued workload."},{severity:"medium",saving:"$320/mo",desc:"Mistral-7B-v0.3 is running on A100-80GB but only using 14GB VRAM. Downgrade to A10G for 65% cost reduction."},{severity:"low",saving:"$120/mo",desc:"Enable INT8 quantization for CodeLlama-34B batch inference workloads. Estimated 15% throughput increase with minimal quality impact."}].map((rec,i)=>
-          React.createElement("div",{key:i,style:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"16px 20px",borderLeft:`3px solid ${rec.severity==="high"?C.red:rec.severity==="medium"?C.orange:C.green}`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}},
-            React.createElement("div",null,
-              React.createElement("span",{style:{fontSize:10,fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1,textTransform:"uppercase",fontWeight:600,color:rec.severity==="high"?C.red:rec.severity==="medium"?C.orange:C.green}},rec.severity+" priority"),
-              React.createElement("div",{style:{fontSize:13,color:C.textDim,marginTop:6,lineHeight:1.5}},rec.desc)
-            ),
-            React.createElement("div",{style:{padding:"6px 14px",borderRadius:6,whiteSpace:"nowrap",background:C.greenDim,color:C.green,fontSize:13,fontWeight:600,fontFamily:"'IBM Plex Mono',monospace"}},"Save "+rec.saving)
-          )
-        )
-      )
-    )
-  )
-);
+tab==="costs"?e(React.Fragment,null,
+e(ST,{icon:"\uD83D\uDCB0"},"Cost Breakdown"),
+e("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},
+e("div",{style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:12,padding:24}},
+e("div",{style:{fontSize:13,fontWeight:500,marginBottom:16}},"Cost per Hour (Trend)"),
+e(RC.ResponsiveContainer,{width:"100%",height:200},
+e(RC.AreaChart,{data:costD},
+e("defs",null,e("linearGradient",{id:"cg",x1:0,y1:0,x2:0,y2:1},e("stop",{offset:"0%",stopColor:C.or,stopOpacity:.25}),e("stop",{offset:"100%",stopColor:C.or,stopOpacity:0}))),
+e(RC.XAxis,{dataKey:"time",tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,interval:intv}),
+e(RC.YAxis,{tick:{fontSize:10,fill:C.tm},tickLine:false,axisLine:false,width:40,unit:"$"}),
+e(RC.Tooltip,{content:e(TT)}),
+e(RC.Area,{type:"monotone",dataKey:"value",stroke:C.or,fill:"url(#cg)",strokeWidth:1.5,name:"$/hr",dot:false})))),
+
+e("div",{style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:12,padding:24}},
+e("div",{style:{fontSize:13,fontWeight:500,marginBottom:16}},"Cost Distribution"),
+e("div",{style:{display:"flex",alignItems:"center",gap:24}},
+e(RC.ResponsiveContainer,{width:"50%",height:200},
+e(RC.PieChart,null,
+e(RC.Pie,{data:COSTS,cx:"50%",cy:"50%",innerRadius:50,outerRadius:80,dataKey:"value",strokeWidth:0},
+COSTS.map(function(x,i){return e(RC.Cell,{key:i,fill:x.color})})))),
+e("div",{style:{flex:1}},COSTS.map(function(x){return e("div",{key:x.name,style:{display:"flex",alignItems:"center",gap:8,padding:"6px 0",fontSize:13}},
+e("span",{style:{width:10,height:10,borderRadius:3,background:x.color,flexShrink:0}}),
+e("span",{style:{flex:1,color:C.td}},x.name),
+e("span",{style:{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,fontWeight:500}},x.value+"%"))}))))),
+
+e(ST,{icon:"\uD83D\uDCCA"},"Cost Efficiency Metrics"),
+e("div",{style:{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:12}},
+e(MC,{label:"COST / 1M TOKENS",value:"$0.42",change:"-$0.08 vs last week",dir:"up",color:C.gn}),
+e(MC,{label:"COST / 1K REQUESTS",value:"$0.87",change:"-12% optimized",dir:"up",color:C.gn}),
+e(MC,{label:"GPU IDLE WASTE",value:"$2.14",unit:"/hr",change:"11% of total spend",dir:"down",color:C.rd}),
+e(MC,{label:"MONTHLY PROJECTED",value:"$14,227",change:"Based on current usage",color:C.ac})),
+
+e(ST,{icon:"\uD83D\uDCA1"},"Optimization Recommendations"),
+e("div",{style:{display:"grid",gap:10}},
+[{sev:"high",save:"$840/mo",desc:"gpu-h100-03 has been idle for 6+ hours. Consider scale-to-zero policy or reassigning to a queued workload."},
+{sev:"medium",save:"$320/mo",desc:"Mistral-7B-v0.3 is running on A100-80GB but only using 14GB VRAM. Downgrade to A10G for 65% cost reduction."},
+{sev:"low",save:"$120/mo",desc:"Enable INT8 quantization for CodeLlama-34B batch inference workloads. Estimated 15% throughput increase with minimal quality impact."}].map(function(r,i){
+return e("div",{key:i,style:{background:C.sf,border:"1px solid "+C.bd,borderRadius:10,padding:"16px 20px",borderLeft:"3px solid "+(r.sev==="high"?C.rd:r.sev==="medium"?C.or:C.gn),display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}},
+e("div",null,
+e("span",{style:{fontSize:10,fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1,textTransform:"uppercase",fontWeight:600,color:r.sev==="high"?C.rd:r.sev==="medium"?C.or:C.gn}},r.sev+" priority"),
+e("div",{style:{fontSize:13,color:C.td,marginTop:6,lineHeight:1.5}},r.desc)),
+e("div",{style:{padding:"6px 14px",borderRadius:6,whiteSpace:"nowrap",background:C.gnd,color:C.gn,fontSize:13,fontWeight:600,fontFamily:"'IBM Plex Mono',monospace"}},"Save "+r.save))}))
+):null
+
+));
 }
 
-ReactDOM.render(React.createElement(App),document.getElementById("root"));
+ReactDOM.render(e(App),document.getElementById("root"));
 </script>
 </body>
 </html>
