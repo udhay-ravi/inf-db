@@ -56,7 +56,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--tx);min-he
 .chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 
 /* SVG Charts */
-svg.chart{width:100%;display:block}
+svg.chart{width:100%;display:block;overflow:visible}
 
 /* Status dot */
 .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle}
@@ -166,7 +166,8 @@ tr:nth-child(even){background:var(--sf)}
     </div>
     <div class="chart-row">
       <div class="chart-card fade">
-        <div style="font-size:13px;font-weight:500;margin-bottom:12px">Latency Distribution</div>
+        <div style="font-size:13px;font-weight:500;margin-bottom:4px">Latency Distribution (All Endpoints)</div>
+        <div style="font-size:10px;color:var(--td);margin-bottom:10px">Per-endpoint P95 vs SLA in Model Deployments tab</div>
         <svg class="chart" id="chart-latency" viewBox="0 0 400 170"></svg>
         <div class="legend">
           <div class="legend-item"><span class="legend-line" style="background:var(--gn)"></span>p50</div>
@@ -244,10 +245,10 @@ var GPUS=[
 {id:"gpu-a100-05",type:"A100-80GB",util:3,mem:5,temp:38,st:"draining",model:"\u2014",vram:"4/80 GB",pw:"85W"}
 ];
 var MODELS=[
-{name:"Llama-3.1-70B",rep:3,rps:1842,ttft:"52ms",tps:"78 t/s",up:"99.99%",cost:"$8.64/hr",st:"healthy"},
-{name:"Mixtral-8x22B",rep:1,rps:624,ttft:"68ms",tps:"45 t/s",up:"99.98%",cost:"$4.12/hr",st:"healthy"},
-{name:"Mistral-7B-v0.3",rep:1,rps:2105,ttft:"18ms",tps:"142 t/s",up:"100%",cost:"$2.88/hr",st:"healthy"},
-{name:"CodeLlama-34B",rep:1,rps:388,ttft:"41ms",tps:"92 t/s",up:"99.97%",cost:"$4.12/hr",st:"scaling"}
+{name:"Llama-3.1-70B",rep:3,rps:1842,ttft:"52ms",tps:"78 t/s",up:"99.99%",cost:"$8.64/hr",st:"healthy",p95:118,sla:200},
+{name:"Mixtral-8x22B",rep:1,rps:624,ttft:"68ms",tps:"45 t/s",up:"99.98%",cost:"$4.12/hr",st:"healthy",p95:156,sla:250},
+{name:"Mistral-7B-v0.3",rep:1,rps:2105,ttft:"18ms",tps:"142 t/s",up:"100%",cost:"$2.88/hr",st:"healthy",p95:42,sla:100},
+{name:"CodeLlama-34B",rep:1,rps:388,ttft:"41ms",tps:"92 t/s",up:"99.97%",cost:"$4.12/hr",st:"scaling",p95:98,sla:150}
 ];
 var COSTS=[{n:"GPU Compute",v:68,c:"#3b82f6"},{n:"Networking",v:12,c:"#06b6d4"},{n:"Storage",v:8,c:"#8b5cf6"},{n:"CPU/RAM",v:7,c:"#f59e0b"},{n:"Egress",v:5,c:"#10b981"}];
 var BENCHMARKS=[
@@ -268,44 +269,78 @@ function genData(n,base,v){var d=[];for(var i=0;i<n;i++){d.push(base+(Math.rando
 function dotClass(s){return s==="active"||s==="healthy"?"green":s==="scaling"||s==="draining"?"orange":s==="idle"?"muted":"red"}
 function barColor(v){return v>85?"var(--rd)":v>60?"var(--cy)":"var(--tm)"}
 
-function makePath(data,w,h,maxV,minV){
+var AX={pl:40,pt:5,pb:22,pr:5};
+function makePath(data,cw,ch,maxV,minV){
   if(!maxV)maxV=Math.max.apply(null,data)*1.1;
   if(minV===undefined)minV=Math.min.apply(null,data)*.9;
   var pts=[];
   for(var i=0;i<data.length;i++){
-    var x=(i/(data.length-1))*w;
-    var y=h-((data[i]-minV)/(maxV-minV))*h;
+    var x=AX.pl+(i/(data.length-1))*cw;
+    var y=AX.pt+ch-((data[i]-minV)/(maxV-minV))*ch;
     pts.push(x.toFixed(1)+","+y.toFixed(1));
   }
   return pts.join(" ");
 }
+function axisHTML(cw,ch,maxV,minV,unit,nTicks){
+  if(!nTicks)nTicks=4;
+  var html='';
+  // Gridlines and Y labels
+  for(var i=0;i<=nTicks;i++){
+    var frac=i/nTicks;
+    var y=AX.pt+ch-frac*ch;
+    var val=minV+frac*(maxV-minV);
+    var label;
+    if(unit==='%'){label=val<1?val.toFixed(2)+'%':Math.round(val)+'%';}
+    else if(unit==='ms')label=Math.round(val)+'ms';
+    else if(unit==='rps')label=val>=1000?Math.round(val/100)/10+'k':Math.round(val);
+    else if(unit==='$/hr')label='$'+Math.round(val);
+    else label=val>=1000?(val/1000).toFixed(1)+'k':val>=10?Math.round(val):val.toFixed(2);
+    html+='<line x1="'+AX.pl+'" y1="'+y.toFixed(1)+'" x2="'+(AX.pl+cw).toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>';
+    html+='<text x="'+(AX.pl-6)+'" y="'+(y+3).toFixed(1)+'" fill="rgba(255,255,255,0.5)" font-size="10" font-family="IBM Plex Mono,monospace" text-anchor="end">'+label+'</text>';
+  }
+  // X-axis time labels
+  var times=["24h","20h","16h","12h","8h","4h","now"];
+  for(var j=0;j<times.length;j++){
+    var x=AX.pl+(j/(times.length-1))*cw;
+    html+='<text x="'+x.toFixed(1)+'" y="'+(AX.pt+ch+16)+'" fill="rgba(255,255,255,0.45)" font-size="9" font-family="IBM Plex Mono,monospace" text-anchor="middle">'+times[j]+'</text>';
+  }
+  // Y-axis unit label
+  html+='<text x="4" y="'+(AX.pt+ch/2)+'" fill="rgba(255,255,255,0.4)" font-size="9" font-family="IBM Plex Mono,monospace" transform="rotate(-90,4,'+(AX.pt+ch/2)+')">'+unit+'</text>';
+  return html;
+}
 
-function makeArea(svgId,data,w,h,stroke,fillId,maxV,minV){
+function makeArea(svgId,data,w,h,stroke,fillId,maxV,minV,unit){
   var svg=document.getElementById(svgId);
   if(!svg)return;
+  var cw=w-AX.pl-AX.pr;
+  var ch=h-AX.pt-AX.pb;
   if(!maxV)maxV=Math.max.apply(null,data)*1.1;
   if(minV===undefined)minV=Math.min.apply(null,data)*.9;
-  var pts=makePath(data,w,h,maxV,minV);
-  var first="0,"+h;
-  var last=w+","+h;
+  var pts=makePath(data,cw,ch,maxV,minV);
+  var first=AX.pl+","+( AX.pt+ch);
+  var last=(AX.pl+cw)+","+(AX.pt+ch);
+  var axes=unit?axisHTML(cw,ch,maxV,minV,unit):'';
   svg.innerHTML='<defs><linearGradient id="'+fillId+'" x1="0" y1="0" x2="0" y2="1">'+
     '<stop offset="0%" stop-color="'+stroke+'" stop-opacity="0.25"/>'+
     '<stop offset="100%" stop-color="'+stroke+'" stop-opacity="0"/></linearGradient></defs>'+
     '<polygon points="'+first+" "+pts+" "+last+'" fill="url(#'+fillId+')" />'+
-    '<polyline points="'+pts+'" fill="none" stroke="'+stroke+'" stroke-width="2" stroke-linejoin="round"/>';
+    '<polyline points="'+pts+'" fill="none" stroke="'+stroke+'" stroke-width="2" stroke-linejoin="round"/>'+axes;
 }
 
-function makeMultiLine(svgId,datasets,w,h){
+function makeMultiLine(svgId,datasets,w,h,unit){
   var svg=document.getElementById(svgId);if(!svg)return;
+  var cw=w-AX.pl-AX.pr;
+  var ch=h-AX.pt-AX.pb;
   var allVals=[];datasets.forEach(function(d){allVals=allVals.concat(d.data)});
   var maxV=Math.max.apply(null,allVals)*1.15;
   var minV=Math.min.apply(null,allVals)*.85;
+  var axes=unit?axisHTML(cw,ch,maxV,minV,unit):'';
   var html='';
   datasets.forEach(function(ds){
-    var pts=makePath(ds.data,w,h,maxV,minV);
+    var pts=makePath(ds.data,cw,ch,maxV,minV);
     html+='<polyline points="'+pts+'" fill="none" stroke="'+ds.color+'" stroke-width="2" stroke-linejoin="round"/>';
   });
-  svg.innerHTML=html;
+  svg.innerHTML=html+axes;
 }
 
 function makePie(svgId,data){
@@ -336,7 +371,7 @@ var avgU=Math.round(GPUS.filter(function(g){return g.st==="active"}).reduce(func
 // KPIs
 var kpis=[
 {l:"TOTAL RPS",v:totalRPS.toLocaleString(),ch:"+12.3% vs yesterday",dir:"up",c:"var(--ac)"},
-{l:"P95 LATENCY",v:"118",u:"ms",ch:"-8ms vs avg",dir:"up",c:"var(--gn)"},
+{l:"SLA COMPLIANCE",v:"4/4",u:"endpoints",ch:"All within latency target",dir:"up",c:"var(--gn)"},
 {l:"GPU UTILIZATION",v:avgU+"%",ch:"Across 6 active GPUs",c:avgU>80?"var(--or)":"var(--gn)"},
 {l:"ACTIVE GPUS",v:actGPU+"/"+GPUS.length,sub:"1 idle \u00B7 1 draining",c:"var(--cy)"},
 {l:"TOKENS / SEC",v:"142K",ch:"+18K vs yesterday",dir:"up",c:"var(--pu)"},
@@ -369,12 +404,12 @@ var latP50=genData(48,50,12);
 var latP95=genData(48,115,25);
 var latP99=genData(48,185,50);
 
-makeArea("chart-rps",rpsData,800,160,"#3b82f6","rpsF");
-makeMultiLine("chart-latency",[{data:latP50,color:"#10b981"},{data:latP95,color:"#f59e0b"},{data:latP99,color:"#ef4444"}],400,150);
-makeArea("chart-gpu",gpuData,400,150,"#06b6d4","gpuF",100,0);
-makeArea("chart-error",errData,400,120,"#ef4444","errF");
-makeArea("chart-kv",kvData,400,120,"#8b5cf6","kvF",100,0);
-makeArea("chart-cost",costDataArr,400,160,"#f59e0b","costF");
+makeArea("chart-rps",rpsData,800,180,"#3b82f6","rpsF",undefined,undefined,"rps");
+makeMultiLine("chart-latency",[{data:latP50,color:"#10b981"},{data:latP95,color:"#f59e0b"},{data:latP99,color:"#ef4444"}],400,170,"ms");
+makeArea("chart-gpu",gpuData,400,170,"#06b6d4","gpuF",100,0,"%");
+makeArea("chart-error",errData,400,140,"#ef4444","errF",undefined,undefined,"%");
+makeArea("chart-kv",kvData,400,140,"#8b5cf6","kvF",100,0,"%");
+makeArea("chart-cost",costDataArr,400,180,"#f59e0b","costF",undefined,undefined,"$/hr");
 makePie("pie-chart",COSTS);
 
 // Pie legend
@@ -414,9 +449,12 @@ document.getElementById("gpu-heatmap").innerHTML=GPUS.map(function(g){
 // Model cards
 var mc=document.getElementById("model-cards");
 mc.innerHTML=MODELS.map(function(m){
+  var pct=Math.round(m.p95/m.sla*100);var slaOk=m.p95<m.sla;
+  var slaHtml='<div class="model-metric"><div class="val" style="color:'+(slaOk?'var(--gn)':'var(--rd)')+'">'+m.p95+'<span style="font-size:12px;font-weight:400;color:var(--td)">/'+m.sla+'ms</span></div><div style="margin-top:4px"><div class="gpu-bar-bg" style="height:4px"><div class="gpu-bar-fill" style="width:'+pct+'%;background:'+(pct>90?'var(--or)':slaOk?'var(--gn)':'var(--rd)')+'"></div></div></div><div class="lbl">P95 vs SLA</div></div>';
   var metrics=[{v:m.rps.toLocaleString(),l:"RPS",c:"var(--ac)"},{v:m.ttft,l:"TTFT",c:"var(--gn)"},{v:m.tps,l:"Throughput",c:"var(--pu)"},{v:m.up,l:"Uptime",c:"var(--gn)"},{v:m.cost,l:"Cost",c:"var(--or)"}];
-  return '<div class="model-card">'+
+  return '<div class="model-card" style="grid-template-columns:220px 1fr repeat(5,1fr) auto">'+
     '<div><div style="font-weight:600;font-size:15px">'+m.name+'</div><div style="font-size:11px;color:var(--td);margin-top:4px">'+m.rep+' replica'+(m.rep>1?'s':'')+' \u00B7 <span class="dot '+dotClass(m.st)+'"></span>'+m.st+'</div></div>'+
+    slaHtml+
     metrics.map(function(d){return '<div class="model-metric"><div class="val" style="color:'+d.c+'">'+d.v+'</div><div class="lbl">'+d.l+'</div></div>'}).join('')+
     '<button class="detail-btn mono">Details \u2192</button></div>';
 }).join('');
@@ -463,7 +501,7 @@ document.querySelectorAll('.time-btn').forEach(function(btn){
 // Auto-refresh tick
 setInterval(function(){
   rpsData.shift();rpsData.push(2400+(Math.random()-.5)*800);
-  makeArea("chart-rps",rpsData,800,160,"#3b82f6","rpsF");
+  makeArea("chart-rps",rpsData,800,180,"#3b82f6","rpsF",undefined,undefined,"rps");
 },5000);
 </script>
 </body>
