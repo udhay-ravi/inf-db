@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dedicated Inference — Fleet Overview Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root{--bg:#08090d;--sf:#0f1117;--sf2:#161820;--sf3:#1c1e28;--bd:#252736;--tx:#e2e4ed;--td:#7a7f99;--tm:#4e5269;--ac:#3b82f6;--acd:rgba(59,130,246,0.12);--gn:#10b981;--gnd:rgba(16,185,129,0.12);--rd:#ef4444;--rdd:rgba(239,68,68,0.12);--or:#f59e0b;--ord:rgba(245,158,11,0.12);--cy:#06b6d4;--cyd:rgba(6,182,212,0.12);--pu:#8b5cf6;--pud:rgba(139,92,246,0.12)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fade{animation:fadeUp .5s ease forwards}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
+.mono{font-family:'IBM Plex Mono',monospace}
+
+/* Header */
+.header{background:var(--sf);border-bottom:1px solid var(--bd);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--ac),var(--cy));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff}
+.header-left{display:flex;align-items:center;gap:14px}
+.header-right{display:flex;align-items:center;gap:8px}
+.live-badge{margin-left:12px;padding:6px 12px;border-radius:6px;background:var(--gnd);color:var(--gn);font-size:11px;font-weight:500;display:flex;align-items:center;gap:6px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--gn);animation:pulse 2s infinite}
+
+/* Time tabs */
+.time-btn{padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:500;background:transparent;color:var(--td);transition:all .2s}
+.time-btn.active{background:var(--acd);color:var(--ac)}
+
+/* Nav */
+.nav{padding:12px 28px 0;display:flex;gap:4px;border-bottom:1px solid var(--bd);background:var(--bg)}
+.nav-btn{padding:10px 18px;border:none;cursor:pointer;font-size:13px;font-weight:500;background:transparent;color:var(--td);border-bottom:2px solid transparent;transition:all .2s;margin-bottom:-1px}
+.nav-btn.active{color:var(--tx);border-bottom-color:var(--ac)}
+
+/* Content */
+.content{padding:24px 28px 60px;max-width:1400px;margin:0 auto}
+
+/* Fleet Health Banner */
+.fleet-banner{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.fleet-banner-left{display:flex;align-items:center;gap:20px}
+.fleet-banner-title{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.fleet-banner-subtitle{font-size:12px;color:var(--td);margin-top:2px}
+.fleet-status-pills{display:flex;gap:10px;flex-wrap:wrap}
+.fleet-pill{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600}
+.fleet-pill .count{font-size:22px;font-weight:700;letter-spacing:-1px}
+.fleet-pill .label{font-size:10px;color:var(--td);text-transform:uppercase;letter-spacing:.5px}
+.fleet-avail{text-align:center}
+.fleet-avail-val{font-size:36px;font-weight:800;letter-spacing:-2px;line-height:1}
+.fleet-avail-label{font-size:10px;color:var(--td);margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+
+/* Grouping selector */
+.group-bar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.group-select{padding:8px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--sf2);color:var(--tx);font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a7f99' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+.group-select:hover{border-color:var(--ac)}
+.group-label{font-size:11px;color:var(--td);text-transform:uppercase;letter-spacing:.5px;font-weight:500}
+
+/* KPI Grid */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:8px}
+.kpi{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:4px}
+.kpi-label{font-size:11px;color:var(--td);letter-spacing:.5px}
+.kpi-val{font-size:28px;font-weight:700;letter-spacing:-1px}
+.kpi-change{font-size:11px}
+.kpi-sub{font-size:11px;color:var(--tm);margin-top:2px}
+.kpi-method{font-size:9px;color:var(--tm);margin-top:4px;padding:2px 6px;border-radius:3px;background:rgba(255,255,255,0.04);display:inline-block}
+
+/* Section title */
+.sec-title{display:flex;align-items:center;gap:10px;margin:32px 0 16px}
+.sec-title span:first-child{font-size:16px}
+.sec-title span:nth-child(2){font-size:13px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.sec-title .line{flex:1;height:1px;background:var(--bd)}
+
+/* Chart card */
+.chart-card{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:20px;margin-bottom:16px}
+.chart-header{display:flex;justify-content:space-between;margin-bottom:12px;font-size:13px}
+.chart-header .peak{font-size:12px;color:var(--td)}
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.chart-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+
+/* SVG Charts */
+svg.chart{width:100%;display:block;overflow:visible}
+
+/* Status dot */
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.dot.green{background:var(--gn);box-shadow:0 0 6px rgba(16,185,129,.4)}
+.dot.orange{background:var(--or);box-shadow:0 0 6px rgba(245,158,11,.4)}
+.dot.muted{background:var(--tm)}
+.dot.red{background:var(--rd);box-shadow:0 0 6px rgba(239,68,68,.4)}
+
+/* GPU Bar */
+.gpu-bar-bg{width:100%;height:5px;background:var(--sf3);border-radius:3px;overflow:hidden}
+.gpu-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+
+/* Table */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{padding:12px 14px;text-align:left;font-size:10px;letter-spacing:1px;color:var(--tm);text-transform:uppercase;font-weight:500;border-bottom:1px solid var(--bd)}
+td{padding:14px;border-bottom:1px solid var(--bd)}
+tr:nth-child(even){background:var(--sf)}
+
+/* Legend */
+.legend{display:flex;gap:16px;justify-content:center;margin-top:4px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--td)}
+.legend-line{width:10px;height:2px;border-radius:1px}
+
+/* SLA badge */
+.sla-badge{font-size:10px;padding:3px 8px;border-radius:4px;background:var(--gnd);color:var(--gn)}
+
+/* Gauge */
+.gauge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.gauge-card{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:16px;text-align:center}
+.gauge-val{font-size:32px;font-weight:700;letter-spacing:-1px;line-height:1;margin:8px 0}
+.gauge-label{font-size:11px;color:var(--td)}
+.gauge-ring{position:relative;display:inline-block}
+
+/* Comparison bar */
+.comp-bar-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--bd)}
+.comp-bar-row:last-child{border-bottom:none}
+.comp-bar-name{width:160px;font-size:12px;font-weight:500;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.comp-bar-track{flex:1;height:24px;background:var(--sf3);border-radius:4px;overflow:hidden;position:relative}
+.comp-bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:600;color:#fff;transition:width .5s ease}
+.comp-bar-val{width:80px;text-align:right;font-size:13px;font-weight:600;flex-shrink:0}
+
+/* Endpoint table card */
+.ep-table-card{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:20px;margin-bottom:16px;overflow-x:auto}
+
+/* Tab panels */
+.tab-panel{display:none}.tab-panel.active{display:block}
+
+/* Paid badge */
+.paid-badge{font-size:9px;padding:2px 6px;border-radius:3px;background:var(--ord);color:var(--or);font-weight:600;margin-left:6px;vertical-align:middle}
+.free-badge{font-size:9px;padding:2px 6px;border-radius:3px;background:var(--gnd);color:var(--gn);font-weight:600;margin-left:6px;vertical-align:middle}
+
+/* Alert row */
+.alert-row{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--sf);border:1px solid var(--bd);border-radius:8px;margin-bottom:8px;font-size:13px}
+.alert-sev{font-size:9px;padding:3px 8px;border-radius:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+
+/* Donut center text */
+.donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.donut-center-val{font-size:20px;font-weight:700}
+.donut-center-label{font-size:9px;color:var(--td);text-transform:uppercase}
+
+/* Cost distribution */
+.cost-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cost-card{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:24px}
+.pie-wrap{display:flex;align-items:center;gap:24px}
+.pie-legend{flex:1}
+.pie-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px}
+.pie-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+@media(max-width:900px){
+.chart-row,.chart-row-3,.cost-row{grid-template-columns:1fr}
+.fleet-banner{flex-direction:column;text-align:center}
+.fleet-banner-left{flex-direction:column}
+.fleet-status-pills{justify-content:center}
+.kpi-grid{grid-template-columns:repeat(2,1fr)}
+.gauge-grid{grid-template-columns:repeat(2,1fr)}
+.comp-bar-name{width:100px}
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">DI</div>
+    <div>
+      <div style="font-size:15px;font-weight:600;letter-spacing:-.3px">Dedicated Inference <span style="color:var(--ac);font-size:12px;font-weight:500;margin-left:6px">Fleet Overview</span></div>
+      <div class="mono" style="font-size:11px;color:var(--td)">project-alpha · 8 endpoints · 3 regions <span class="dot green" style="margin-left:4px"></span><span style="color:var(--gn)">Operational</span></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="time-btn mono active" data-range="1h">1h</button>
+    <button class="time-btn mono" data-range="6h">6h</button>
+    <button class="time-btn mono" data-range="24h">24h</button>
+    <button class="time-btn mono" data-range="7d">7d</button>
+    <div class="live-badge mono"><span class="live-dot"></span>LIVE</div>
+  </div>
+</div>
+
+<!-- Nav -->
+<div class="nav">
+  <button class="nav-btn active" data-tab="fleet">Fleet Overview</button>
+  <button class="nav-btn" data-tab="latency">Latency & Performance</button>
+  <button class="nav-btn" data-tab="utilization">Utilization</button>
+  <button class="nav-btn" data-tab="comparison">Cross-Endpoint Comparison</button>
+  <button class="nav-btn" data-tab="cost">Cost & Usage</button>
+</div>
+
+<!-- Content -->
+<div class="content">
+
+  <!-- Fleet Health Banner (P0) -->
+  <div class="fleet-banner fade" id="fleet-banner"></div>
+
+  <!-- Grouping Selector (P0) -->
+  <div class="group-bar">
+    <span class="group-label mono">Aggregate By</span>
+    <select class="group-select" id="group-select">
+      <option value="all">All Endpoints (Project)</option>
+      <option value="model">By Model</option>
+      <option value="region">By Region</option>
+      <option value="gpu">By GPU Type</option>
+    </select>
+    <span class="mono" style="font-size:11px;color:var(--tm)" id="group-info">Showing all 8 endpoints across 3 regions</span>
+  </div>
+
+  <!-- ======================== FLEET OVERVIEW TAB ======================== -->
+  <div class="tab-panel active" id="panel-fleet">
+
+    <!-- Aggregated KPIs (Table 1 metrics) -->
+    <div class="kpi-grid" id="fleet-kpis"></div>
+
+    <div class="sec-title"><span>&#x1F4C8;</span><span class="mono">Fleet Throughput</span><span class="free-badge">FREE</span><div class="line"></div></div>
+    <div class="chart-card fade">
+      <div class="chart-header"><span style="font-weight:500">Fleet Throughput (2xx req/sec) <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">SUM across endpoints</span></span><span class="peak mono">Peak: 12,847 RPS</span></div>
+      <svg class="chart" id="chart-fleet-rps" viewBox="0 0 800 180"></svg>
+    </div>
+
+    <div class="chart-row">
+      <div class="chart-card fade">
+        <div class="chart-header"><span style="font-weight:500">Fleet Error Rate <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">W-AVG by request volume</span></span><span class="sla-badge mono">WITHIN SLA</span></div>
+        <svg class="chart" id="chart-fleet-error" viewBox="0 0 400 140"></svg>
+      </div>
+      <div class="chart-card fade">
+        <div style="font-size:13px;font-weight:500;margin-bottom:12px">Fleet Availability % <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">W-AVG</span></div>
+        <svg class="chart" id="chart-fleet-avail" viewBox="0 0 400 140"></svg>
+      </div>
+    </div>
+
+    <!-- Fleet Health Summary (COUNT by state) -->
+    <div class="sec-title"><span>&#x1F3E5;</span><span class="mono">Fleet Health Summary</span><div class="line"></div></div>
+    <div id="fleet-health-table" class="ep-table-card"></div>
+
+  </div>
+
+  <!-- ======================== LATENCY & PERFORMANCE TAB ======================== -->
+  <div class="tab-panel" id="panel-latency">
+
+    <div class="sec-title"><span>&#x23F1;</span><span class="mono">Fleet TTFT (Time to First Token)</span><span class="free-badge">FREE</span><div class="line"></div></div>
+    <div class="chart-card fade">
+      <div class="chart-header"><span style="font-weight:500">Fleet TTFT p50 / p95 / p99 <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">MERGED-PCT</span></span></div>
+      <svg class="chart" id="chart-fleet-ttft" viewBox="0 0 800 180"></svg>
+      <div class="legend">
+        <div class="legend-item"><span class="legend-line" style="background:var(--gn)"></span>p50</div>
+        <div class="legend-item"><span class="legend-line" style="background:var(--or)"></span>p95</div>
+        <div class="legend-item"><span class="legend-line" style="background:var(--rd)"></span>p99</div>
+      </div>
+    </div>
+
+    <div class="chart-row">
+      <div class="chart-card fade">
+        <div class="chart-header"><span style="font-weight:500">Fleet Inference Speed (TPOT) <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">MERGED-PCT</span></span></div>
+        <svg class="chart" id="chart-fleet-tpot" viewBox="0 0 400 170"></svg>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-line" style="background:var(--gn)"></span>p50</div>
+          <div class="legend-item"><span class="legend-line" style="background:var(--or)"></span>p95</div>
+          <div class="legend-item"><span class="legend-line" style="background:var(--rd)"></span>p99</div>
+        </div>
+      </div>
+      <div class="chart-card fade">
+        <div class="chart-header"><span style="font-weight:500">Fleet ITL (Inter-Token Latency) <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">MERGED-PCT</span></span></div>
+        <svg class="chart" id="chart-fleet-itl" viewBox="0 0 400 170"></svg>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-line" style="background:var(--gn)"></span>p50</div>
+          <div class="legend-item"><span class="legend-line" style="background:var(--or)"></span>p95</div>
+          <div class="legend-item"><span class="legend-line" style="background:var(--rd)"></span>p99</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-row-3">
+      <div class="chart-card fade">
+        <div style="font-size:13px;font-weight:500;margin-bottom:12px">Fleet Prefill Time <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">W-AVG</span></div>
+        <svg class="chart" id="chart-fleet-prefill" viewBox="0 0 300 130"></svg>
+      </div>
+      <div class="chart-card fade">
+        <div style="font-size:13px;font-weight:500;margin-bottom:12px">Fleet Decode Time <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">W-AVG</span></div>
+        <svg class="chart" id="chart-fleet-decode" viewBox="0 0 300 130"></svg>
+      </div>
+      <div class="chart-card fade">
+        <div style="font-size:13px;font-weight:500;margin-bottom:12px">Fleet Queue Time <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">W-AVG</span></div>
+        <svg class="chart" id="chart-fleet-queue" viewBox="0 0 300 130"></svg>
+      </div>
+    </div>
+
+    <div class="sec-title"><span>&#x1F3AF;</span><span class="mono">Fleet E2E Latency</span><div class="line"></div></div>
+    <div class="chart-card fade">
+      <div class="chart-header"><span style="font-weight:500">Fleet E2E Latency p95 / p99 <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">MERGED-PCT</span></span></div>
+      <svg class="chart" id="chart-fleet-e2e" viewBox="0 0 800 160"></svg>
+      <div class="legend">
+        <div class="legend-item"><span class="legend-line" style="background:var(--or)"></span>p95</div>
+        <div class="legend-item"><span class="legend-line" style="background:var(--rd)"></span>p99</div>
+      </div>
+    </div>
+
+    <!-- Latency KPIs -->
+    <div class="kpi-grid" id="latency-kpis"></div>
+  </div>
+
+  <!-- ======================== UTILIZATION TAB ======================== -->
+  <div class="tab-panel" id="panel-utilization">
+
+    <div class="sec-title"><span>&#x1F4BE;</span><span class="mono">Fleet KV Cache Utilization</span><span class="free-badge">FREE</span><div class="line"></div></div>
+    <div class="chart-row">
+      <div class="chart-card fade">
+        <div class="chart-header"><span style="font-weight:500">Fleet KV Cache % (avg) <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">W-AVG</span></span></div>
+        <svg class="chart" id="chart-kv-avg" viewBox="0 0 400 140"></svg>
+      </div>
+      <div class="chart-card fade">
+        <div class="chart-header"><span style="font-weight:500">Fleet KV Cache % (worst endpoint) <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">WORST</span></span></div>
+        <svg class="chart" id="chart-kv-worst" viewBox="0 0 400 140"></svg>
+      </div>
+    </div>
+
+    <div class="sec-title"><span>&#x1F4BB;</span><span class="mono">Fleet VRAM Usage</span><div class="line"></div></div>
+    <div class="chart-row">
+      <div class="chart-card fade">
+        <div class="chart-header"><span style="font-weight:500">Fleet VRAM Usage (avg) <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">W-AVG</span></span></div>
+        <svg class="chart" id="chart-vram-avg" viewBox="0 0 400 140"></svg>
+      </div>
+      <div class="chart-card fade">
+        <div class="chart-header"><span style="font-weight:500">Fleet VRAM Usage (worst endpoint) <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">WORST</span></span></div>
+        <svg class="chart" id="chart-vram-worst" viewBox="0 0 400 140"></svg>
+      </div>
+    </div>
+
+    <!-- KV Cache per endpoint gauges -->
+    <div class="sec-title"><span>&#x1F50B;</span><span class="mono">KV Cache by Endpoint</span><div class="line"></div></div>
+    <div class="gauge-grid" id="kv-gauges"></div>
+
+    <!-- Utilization KPIs -->
+    <div class="kpi-grid" id="util-kpis" style="margin-top:24px"></div>
+  </div>
+
+  <!-- ======================== CROSS-ENDPOINT COMPARISON TAB ======================== -->
+  <div class="tab-panel" id="panel-comparison">
+
+    <div class="sec-title"><span>&#x1F4CA;</span><span class="mono">TTFT Comparison</span><span class="free-badge">FREE</span><div class="line"></div></div>
+    <div class="chart-card fade" id="comp-ttft"></div>
+
+    <div class="sec-title"><span>&#x26A1;</span><span class="mono">Speed Comparison (TPOT)</span><div class="line"></div></div>
+    <div class="chart-card fade" id="comp-tpot"></div>
+
+    <div class="sec-title"><span>&#x26A0;&#xFE0F;</span><span class="mono">Error Rate Ranking</span><div class="line"></div></div>
+    <div class="chart-card fade" id="comp-error"></div>
+
+    <div class="sec-title"><span>&#x1F4C8;</span><span class="mono">Traffic Distribution</span><div class="line"></div></div>
+    <div class="chart-card fade">
+      <svg class="chart" id="chart-traffic-dist" viewBox="0 0 800 200"></svg>
+      <div class="legend" id="traffic-legend"></div>
+    </div>
+
+    <div class="sec-title"><span>&#x1F4CA;</span><span class="mono">Latency Distribution (Box Plot)</span><span class="paid-badge">PAID</span><div class="line"></div></div>
+    <div class="chart-card fade">
+      <svg class="chart" id="chart-latency-box" viewBox="0 0 800 200"></svg>
+    </div>
+
+    <!-- Endpoint comparison table -->
+    <div class="sec-title"><span>&#x1F4CB;</span><span class="mono">Endpoint Summary Table</span><div class="line"></div></div>
+    <div class="ep-table-card">
+      <table id="endpoint-summary-table"></table>
+    </div>
+  </div>
+
+  <!-- ======================== COST & USAGE TAB ======================== -->
+  <div class="tab-panel" id="panel-cost">
+
+    <div class="sec-title"><span>&#x23F3;</span><span class="mono">Total GPU-hrs Consumed</span><span class="free-badge">FREE</span><div class="line"></div></div>
+    <div class="chart-card fade">
+      <div class="chart-header"><span style="font-weight:500">Total GPU-hrs <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">SUM across endpoints</span></span><span class="peak mono">Total: 1,248 GPU-hrs</span></div>
+      <svg class="chart" id="chart-gpu-hrs" viewBox="0 0 800 160"></svg>
+    </div>
+
+    <div class="chart-row">
+      <div class="chart-card fade">
+        <div class="chart-header"><span style="font-weight:500">Total Tokens Processed <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">SUM</span></span></div>
+        <svg class="chart" id="chart-total-tokens" viewBox="0 0 400 140"></svg>
+      </div>
+      <div class="chart-card fade">
+        <div style="font-size:13px;font-weight:500;margin-bottom:16px">Cost by Endpoint <span class="paid-badge">PAID</span></div>
+        <div class="pie-wrap">
+          <svg viewBox="0 0 200 200" width="180" height="180" id="cost-pie"></svg>
+          <div class="pie-legend" id="cost-pie-legend"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cost KPIs -->
+    <div class="kpi-grid" id="cost-kpis"></div>
+  </div>
+
+</div>
+
+<script>
+// ===== ENDPOINT DATA (simulated fleet) =====
+var ENDPOINTS = [
+  {id:"ep-llama70b-nyc1",name:"Llama-3.1-70B",region:"NYC1",gpu:"H100-80GB",replicas:3,rps:2842,ttft_p50:38,ttft_p95:72,ttft_p99:118,tpot_p50:8.2,tpot_p95:14.5,tpot_p99:22.1,itl_p50:7.1,itl_p95:12.8,itl_p99:19.4,e2e_p95:245,e2e_p99:380,errorRate:0.03,availability:99.99,kvCache:72,vram:78,gpuHrs:312,tokens:48200000,cost:8.64,status:"healthy",prefill:12.4,decode:8.2,queue:2.1},
+  {id:"ep-llama70b-sfo1",name:"Llama-3.1-70B",region:"SFO1",gpu:"H100-80GB",replicas:2,rps:1920,ttft_p50:41,ttft_p95:78,ttft_p99:125,tpot_p50:8.8,tpot_p95:15.2,tpot_p99:23.5,itl_p50:7.6,itl_p95:13.5,itl_p99:20.8,e2e_p95:260,e2e_p99:410,errorRate:0.05,availability:99.97,kvCache:68,vram:74,gpuHrs:208,tokens:32100000,cost:5.76,status:"healthy",prefill:13.1,decode:8.8,queue:2.8},
+  {id:"ep-mixtral-nyc1",name:"Mixtral-8x22B",region:"NYC1",gpu:"H100-80GB",replicas:2,rps:1240,ttft_p50:52,ttft_p95:98,ttft_p99:156,tpot_p50:18.5,tpot_p95:28.2,tpot_p99:42.1,itl_p50:16.2,itl_p95:25.4,itl_p99:38.6,e2e_p95:420,e2e_p99:620,errorRate:0.08,availability:99.95,kvCache:85,vram:88,gpuHrs:208,tokens:22400000,cost:8.24,status:"degraded",prefill:22.4,decode:18.5,queue:5.2},
+  {id:"ep-mistral7b-nyc1",name:"Mistral-7B-v0.3",region:"NYC1",gpu:"A100-80GB",replicas:1,rps:3105,ttft_p50:14,ttft_p95:28,ttft_p99:42,tpot_p50:4.1,tpot_p95:7.2,tpot_p99:11.8,itl_p50:3.8,itl_p95:6.5,itl_p99:10.2,e2e_p95:85,e2e_p99:130,errorRate:0.01,availability:100,kvCache:42,vram:35,gpuHrs:104,tokens:58900000,cost:2.88,status:"healthy",prefill:5.2,decode:4.1,queue:0.8},
+  {id:"ep-mistral7b-sfo1",name:"Mistral-7B-v0.3",region:"SFO1",gpu:"A100-80GB",replicas:1,rps:2890,ttft_p50:15,ttft_p95:30,ttft_p99:45,tpot_p50:4.3,tpot_p95:7.5,tpot_p99:12.1,itl_p50:3.9,itl_p95:6.8,itl_p99:10.8,e2e_p95:90,e2e_p99:138,errorRate:0.02,availability:99.99,kvCache:45,vram:38,gpuHrs:104,tokens:54200000,cost:2.88,status:"healthy",prefill:5.5,decode:4.3,queue:1.0},
+  {id:"ep-codellama-nyc1",name:"CodeLlama-34B",region:"NYC1",gpu:"H100-80GB",replicas:1,rps:688,ttft_p50:32,ttft_p95:62,ttft_p99:98,tpot_p50:9.2,tpot_p95:16.8,tpot_p99:25.4,itl_p50:8.5,itl_p95:15.2,itl_p99:23.1,e2e_p95:310,e2e_p99:480,errorRate:0.04,availability:99.98,kvCache:58,vram:62,gpuHrs:104,tokens:12800000,cost:4.12,status:"healthy",prefill:14.8,decode:9.2,queue:1.8},
+  {id:"ep-llama70b-lon1",name:"Llama-3.1-70B",region:"LON1",gpu:"H100-80GB",replicas:2,rps:1680,ttft_p50:44,ttft_p95:82,ttft_p99:132,tpot_p50:9.1,tpot_p95:15.8,tpot_p99:24.2,itl_p50:7.9,itl_p95:14.1,itl_p99:21.5,e2e_p95:275,e2e_p99:430,errorRate:0.06,availability:99.96,kvCache:71,vram:76,gpuHrs:208,tokens:28400000,cost:5.76,status:"healthy",prefill:13.8,decode:9.1,queue:3.2},
+  {id:"ep-mixtral-sfo1",name:"Mixtral-8x22B",region:"SFO1",gpu:"H100-80GB",replicas:1,rps:820,ttft_p50:55,ttft_p95:105,ttft_p99:168,tpot_p50:19.2,tpot_p95:29.8,tpot_p99:44.5,itl_p50:17.1,itl_p95:26.8,itl_p99:40.2,e2e_p95:450,e2e_p99:660,errorRate:0.12,availability:99.92,kvCache:91,vram:92,gpuHrs:104,tokens:15200000,cost:4.12,status:"degraded",prefill:24.1,decode:19.2,queue:6.8}
+];
+
+var ENDPOINT_COLORS=["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16"];
+
+// ===== HELPERS =====
+function genData(n,base,v){var d=[];for(var i=0;i<n;i++){d.push(base+(Math.random()-.5)*v+(Math.random()>.92?v:0))}return d}
+function dotClass(s){return s==="healthy"?"green":s==="degraded"?"orange":s==="down"?"red":"muted"}
+function barColor(v){return v>85?"var(--rd)":v>60?"var(--cy)":"var(--gn)"}
+function fmtNum(n){return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?(n/1000).toFixed(1)+'K':n.toFixed(0)}
+
+var AX={pl:40,pt:5,pb:22,pr:5};
+function makePath(data,cw,ch,maxV,minV){
+  if(!maxV)maxV=Math.max.apply(null,data)*1.1;
+  if(minV===undefined)minV=Math.min.apply(null,data)*.9;
+  var pts=[];
+  for(var i=0;i<data.length;i++){
+    var x=AX.pl+(i/(data.length-1))*cw;
+    var y=AX.pt+ch-((data[i]-minV)/(maxV-minV))*ch;
+    pts.push(x.toFixed(1)+","+y.toFixed(1));
+  }
+  return pts.join(" ");
+}
+function axisHTML(cw,ch,maxV,minV,unit,nTicks){
+  if(!nTicks)nTicks=4;
+  var html='';
+  for(var i=0;i<=nTicks;i++){
+    var frac=i/nTicks;
+    var y=AX.pt+ch-frac*ch;
+    var val=minV+frac*(maxV-minV);
+    var label;
+    if(unit==='%'){label=val<1?val.toFixed(2)+'%':val.toFixed(1)+'%';}
+    else if(unit==='ms')label=Math.round(val)+'ms';
+    else if(unit==='rps')label=val>=1000?Math.round(val/100)/10+'k':Math.round(val);
+    else if(unit==='$/hr')label='$'+val.toFixed(1);
+    else if(unit==='t/s')label=Math.round(val);
+    else if(unit==='gpu-hrs')label=Math.round(val);
+    else if(unit==='tokens')label=fmtNum(val);
+    else label=val>=1000?(val/1000).toFixed(1)+'k':val>=10?Math.round(val):val.toFixed(2);
+    html+='<line x1="'+AX.pl+'" y1="'+y.toFixed(1)+'" x2="'+(AX.pl+cw).toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>';
+    html+='<text x="'+(AX.pl-6)+'" y="'+(y+3).toFixed(1)+'" fill="rgba(255,255,255,0.5)" font-size="10" font-family="IBM Plex Mono,monospace" text-anchor="end">'+label+'</text>';
+  }
+  var times=["60m","50m","40m","30m","20m","10m","now"];
+  for(var j=0;j<times.length;j++){
+    var x=AX.pl+(j/(times.length-1))*cw;
+    html+='<text x="'+x.toFixed(1)+'" y="'+(AX.pt+ch+16)+'" fill="rgba(255,255,255,0.45)" font-size="9" font-family="IBM Plex Mono,monospace" text-anchor="middle">'+times[j]+'</text>';
+  }
+  html+='<text x="4" y="'+(AX.pt+ch/2)+'" fill="rgba(255,255,255,0.4)" font-size="9" font-family="IBM Plex Mono,monospace" transform="rotate(-90,4,'+(AX.pt+ch/2)+')">'+unit+'</text>';
+  return html;
+}
+
+function makeArea(svgId,data,w,h,stroke,fillId,maxV,minV,unit){
+  var svg=document.getElementById(svgId);if(!svg)return;
+  var cw=w-AX.pl-AX.pr;var ch=h-AX.pt-AX.pb;
+  if(!maxV)maxV=Math.max.apply(null,data)*1.1;
+  if(minV===undefined)minV=Math.min.apply(null,data)*.9;
+  var pts=makePath(data,cw,ch,maxV,minV);
+  var first=AX.pl+","+(AX.pt+ch);var last=(AX.pl+cw)+","+(AX.pt+ch);
+  var axes=unit?axisHTML(cw,ch,maxV,minV,unit):'';
+  svg.innerHTML='<defs><linearGradient id="'+fillId+'" x1="0" y1="0" x2="0" y2="1">'+
+    '<stop offset="0%" stop-color="'+stroke+'" stop-opacity="0.25"/>'+
+    '<stop offset="100%" stop-color="'+stroke+'" stop-opacity="0"/></linearGradient></defs>'+
+    '<polygon points="'+first+" "+pts+" "+last+'" fill="url(#'+fillId+')" />'+
+    '<polyline points="'+pts+'" fill="none" stroke="'+stroke+'" stroke-width="2" stroke-linejoin="round"/>'+axes;
+}
+
+function makeMultiLine(svgId,datasets,w,h,unit){
+  var svg=document.getElementById(svgId);if(!svg)return;
+  var cw=w-AX.pl-AX.pr;var ch=h-AX.pt-AX.pb;
+  var allVals=[];datasets.forEach(function(d){allVals=allVals.concat(d.data)});
+  var maxV=Math.max.apply(null,allVals)*1.15;
+  var minV=Math.min.apply(null,allVals)*.85;
+  var axes=unit?axisHTML(cw,ch,maxV,minV,unit):'';
+  var html='';
+  datasets.forEach(function(ds){
+    var pts=makePath(ds.data,cw,ch,maxV,minV);
+    html+='<polyline points="'+pts+'" fill="none" stroke="'+ds.color+'" stroke-width="2" stroke-linejoin="round"/>';
+  });
+  svg.innerHTML=html+axes;
+}
+
+function makePie(svgId,data){
+  var svg=document.getElementById(svgId);if(!svg)return;
+  var total=data.reduce(function(s,d){return s+d.v},0);
+  var cx=100,cy=100,r=70,ir=45;
+  var angle=-90;var html='';
+  data.forEach(function(d){
+    var a1=angle*Math.PI/180;
+    var sweep=d.v/total*360;
+    var a2=(angle+sweep)*Math.PI/180;
+    var lg=sweep>180?1:0;
+    var x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
+    var x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
+    var ix1=cx+ir*Math.cos(a1),iy1=cy+ir*Math.sin(a1);
+    var ix2=cx+ir*Math.cos(a2),iy2=cy+ir*Math.sin(a2);
+    html+='<path d="M'+ix1+' '+iy1+' L'+x1+' '+y1+' A'+r+' '+r+' 0 '+lg+' 1 '+x2+' '+y2+' L'+ix2+' '+iy2+' A'+ir+' '+ir+' 0 '+lg+' 0 '+ix1+' '+iy1+'" fill="'+d.c+'"/>';
+    angle+=sweep;
+  });
+  svg.innerHTML=html;
+}
+
+function renderKPIs(id,items){
+  var el=document.getElementById(id);if(!el)return;
+  el.innerHTML=items.map(function(k){
+    var arrow=k.dir==="up"?"\u25B2":k.dir==="down"?"\u25BC":"\u2013";
+    var chColor=k.dir==="up"?"var(--gn)":k.dir==="down"?"var(--rd)":"var(--td)";
+    return '<div class="kpi">'+
+      '<div class="kpi-label mono">'+k.l+'</div>'+
+      '<div style="display:flex;align-items:baseline;gap:6px"><span class="kpi-val" style="color:'+k.c+'">'+k.v+'</span>'+(k.u?'<span style="font-size:13px;color:var(--td)">'+k.u+'</span>':'')+'</div>'+
+      (k.ch?'<div class="kpi-change mono" style="color:'+chColor+'">'+arrow+' '+k.ch+'</div>':'')+
+      (k.sub?'<div class="kpi-sub">'+k.sub+'</div>':'')+
+      (k.method?'<div class="kpi-method mono">'+k.method+'</div>':'')+
+    '</div>';
+  }).join('');
+}
+
+// ===== COMPUTE AGGREGATED METRICS =====
+var totalRPS = ENDPOINTS.reduce(function(s,e){return s+e.rps},0);
+var totalRequests = ENDPOINTS.reduce(function(s,e){return s+e.rps},0); // proxy for weighting
+
+// W-AVG error rate
+var fleetErrorRate = ENDPOINTS.reduce(function(s,e){return s+e.errorRate*e.rps},0) / totalRPS;
+// W-AVG availability
+var fleetAvail = ENDPOINTS.reduce(function(s,e){return s+e.availability*e.rps},0) / totalRPS;
+// SUM GPU-hrs
+var totalGPUHrs = ENDPOINTS.reduce(function(s,e){return s+e.gpuHrs},0);
+// SUM tokens
+var totalTokens = ENDPOINTS.reduce(function(s,e){return s+e.tokens},0);
+// W-AVG KV cache
+var fleetKVAvg = ENDPOINTS.reduce(function(s,e){return s+e.kvCache*e.rps},0) / totalRPS;
+var fleetKVMax = Math.max.apply(null,ENDPOINTS.map(function(e){return e.kvCache}));
+// W-AVG VRAM
+var fleetVRAMAvg = ENDPOINTS.reduce(function(s,e){return s+e.vram*e.rps},0) / totalRPS;
+var fleetVRAMMax = Math.max.apply(null,ENDPOINTS.map(function(e){return e.vram}));
+// W-AVG prefill/decode/queue
+var fleetPrefill = ENDPOINTS.reduce(function(s,e){return s+e.prefill*e.rps},0) / totalRPS;
+var fleetDecode = ENDPOINTS.reduce(function(s,e){return s+e.decode*e.rps},0) / totalRPS;
+var fleetQueue = ENDPOINTS.reduce(function(s,e){return s+e.queue*e.rps},0) / totalRPS;
+// Hourly cost
+var totalCostHr = ENDPOINTS.reduce(function(s,e){return s+e.cost},0);
+
+// Status counts
+var healthyCnt = ENDPOINTS.filter(function(e){return e.status==="healthy"}).length;
+var degradedCnt = ENDPOINTS.filter(function(e){return e.status==="degraded"}).length;
+var downCnt = ENDPOINTS.filter(function(e){return e.status==="down"}).length;
+
+// ===== RENDER FLEET HEALTH BANNER =====
+document.getElementById("fleet-banner").innerHTML =
+  '<div class="fleet-banner-left">'+
+    '<div class="fleet-avail">'+
+      '<div class="fleet-avail-val" style="color:var(--gn)">'+fleetAvail.toFixed(2)+'%</div>'+
+      '<div class="fleet-avail-label mono">Fleet Availability</div>'+
+    '</div>'+
+    '<div class="fleet-status-pills">'+
+      '<div class="fleet-pill" style="background:var(--gnd)">'+
+        '<div><div class="count" style="color:var(--gn)">'+healthyCnt+'</div><div class="label">Healthy</div></div>'+
+      '</div>'+
+      '<div class="fleet-pill" style="background:var(--ord)">'+
+        '<div><div class="count" style="color:var(--or)">'+degradedCnt+'</div><div class="label">Degraded</div></div>'+
+      '</div>'+
+      '<div class="fleet-pill" style="background:var(--rdd)">'+
+        '<div><div class="count" style="color:var(--rd)">'+downCnt+'</div><div class="label">Down</div></div>'+
+      '</div>'+
+    '</div>'+
+  '</div>'+
+  '<div style="display:flex;gap:24px;flex-wrap:wrap">'+
+    '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--ac)">'+totalRPS.toLocaleString()+'</div><div style="font-size:10px;color:var(--td)">FLEET RPS</div></div>'+
+    '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--pu)">'+ENDPOINTS.length+'</div><div style="font-size:10px;color:var(--td)">ENDPOINTS</div></div>'+
+    '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--cy)">3</div><div style="font-size:10px;color:var(--td)">REGIONS</div></div>'+
+    '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--or)">$'+totalCostHr.toFixed(2)+'</div><div style="font-size:10px;color:var(--td)">/HR COST</div></div>'+
+  '</div>';
+
+// ===== FLEET KPIs =====
+renderKPIs("fleet-kpis",[
+  {l:"FLEET THROUGHPUT",v:totalRPS.toLocaleString(),u:"rps",ch:"+8.2% vs yesterday",dir:"up",c:"var(--ac)",method:"SUM"},
+  {l:"FLEET ERROR RATE",v:fleetErrorRate.toFixed(3),u:"%",ch:"Below 0.1% SLA",dir:"up",c:"var(--gn)",method:"W-AVG"},
+  {l:"FLEET TTFT P95",v:"72",u:"ms",ch:"-4ms vs yesterday",dir:"up",c:"var(--gn)",method:"MERGED-PCT"},
+  {l:"FLEET TPOT P95",v:"15.2",u:"ms",ch:"Stable",c:"var(--cy)",method:"MERGED-PCT"},
+  {l:"TOTAL GPU-HRS",v:totalGPUHrs.toLocaleString(),ch:"Last 24h",c:"var(--pu)",method:"SUM"},
+  {l:"TOTAL TOKENS",v:fmtNum(totalTokens),ch:"Input + Output",c:"var(--or)",method:"SUM"},
+  {l:"FLEET KV CACHE",v:fleetKVAvg.toFixed(1),u:"%",sub:"Worst: "+fleetKVMax+"%",c:fleetKVMax>85?"var(--or)":"var(--cy)",method:"W-AVG + WORST"},
+  {l:"FLEET AVAILABILITY",v:fleetAvail.toFixed(2),u:"%",ch:"Across all endpoints",dir:"up",c:"var(--gn)",method:"W-AVG"}
+]);
+
+// ===== FLEET CHARTS =====
+// Throughput
+var fleetRpsData = genData(60, totalRPS, totalRPS*0.15);
+makeArea("chart-fleet-rps",fleetRpsData,800,180,"#3b82f6","fRpsF",undefined,undefined,"rps");
+
+// Error rate
+var fleetErrData = genData(60, fleetErrorRate, 0.04);
+makeArea("chart-fleet-error",fleetErrData,400,140,"#ef4444","fErrF",undefined,undefined,"%");
+
+// Availability
+var fleetAvailData = genData(60, fleetAvail, 0.06);
+makeArea("chart-fleet-avail",fleetAvailData,400,140,"#10b981","fAvlF",100,99.8,"%");
+
+// ===== FLEET HEALTH TABLE =====
+document.getElementById("fleet-health-table").innerHTML =
+  '<table><thead><tr>'+["Endpoint","Model","Region","GPU","Replicas","Status","RPS","Error Rate","Availability","TTFT p95","KV Cache"].map(function(h){return '<th class="mono">'+h+'</th>'}).join('')+'</tr></thead>'+
+  '<tbody>'+ENDPOINTS.map(function(e){
+    var kvColor = e.kvCache>85?"var(--rd)":e.kvCache>60?"var(--or)":"var(--gn)";
+    return '<tr>'+
+      '<td class="mono" style="font-size:12px;color:var(--ac)">'+e.id+'</td>'+
+      '<td style="font-weight:500;font-size:12px">'+e.name+'</td>'+
+      '<td class="mono" style="font-size:12px">'+e.region+'</td>'+
+      '<td><span class="mono" style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(139,92,246,0.12);color:var(--pu)">'+e.gpu+'</span></td>'+
+      '<td class="mono" style="font-size:12px;text-align:center">'+e.replicas+'</td>'+
+      '<td><span class="dot '+dotClass(e.status)+'"></span><span style="font-size:12px">'+e.status+'</span></td>'+
+      '<td class="mono" style="font-size:12px">'+e.rps.toLocaleString()+'</td>'+
+      '<td class="mono" style="font-size:12px;color:'+(e.errorRate>0.1?"var(--rd)":"var(--gn)")+'">'+e.errorRate.toFixed(2)+'%</td>'+
+      '<td class="mono" style="font-size:12px;color:'+(e.availability<99.95?"var(--or)":"var(--gn)")+'">'+e.availability.toFixed(2)+'%</td>'+
+      '<td class="mono" style="font-size:12px">'+e.ttft_p95+'ms</td>'+
+      '<td style="width:100px"><div style="display:flex;align-items:center;gap:6px"><div class="gpu-bar-bg"><div class="gpu-bar-fill" style="width:'+e.kvCache+'%;background:'+kvColor+'"></div></div><span class="mono" style="font-size:11px;color:var(--td)">'+e.kvCache+'%</span></div></td>'+
+    '</tr>';
+  }).join('')+'</tbody></table>';
+
+// ===== LATENCY TAB =====
+// Fleet TTFT
+var ttftP50 = genData(60,35,10);
+var ttftP95 = genData(60,72,18);
+var ttftP99 = genData(60,120,30);
+makeMultiLine("chart-fleet-ttft",[{data:ttftP50,color:"#10b981"},{data:ttftP95,color:"#f59e0b"},{data:ttftP99,color:"#ef4444"}],800,180,"ms");
+
+// Fleet TPOT
+var tpotP50 = genData(60,9,3);
+var tpotP95 = genData(60,16,5);
+var tpotP99 = genData(60,25,8);
+makeMultiLine("chart-fleet-tpot",[{data:tpotP50,color:"#10b981"},{data:tpotP95,color:"#f59e0b"},{data:tpotP99,color:"#ef4444"}],400,170,"ms");
+
+// Fleet ITL
+var itlP50 = genData(60,8,3);
+var itlP95 = genData(60,14,4);
+var itlP99 = genData(60,22,7);
+makeMultiLine("chart-fleet-itl",[{data:itlP50,color:"#10b981"},{data:itlP95,color:"#f59e0b"},{data:itlP99,color:"#ef4444"}],400,170,"ms");
+
+// Prefill / Decode / Queue
+makeArea("chart-fleet-prefill",genData(60,fleetPrefill,fleetPrefill*0.3),300,130,"#06b6d4","pfF",undefined,undefined,"ms");
+makeArea("chart-fleet-decode",genData(60,fleetDecode,fleetDecode*0.3),300,130,"#8b5cf6","dcF",undefined,undefined,"ms");
+makeArea("chart-fleet-queue",genData(60,fleetQueue,fleetQueue*0.4),300,130,"#f59e0b","qF",undefined,undefined,"ms");
+
+// Fleet E2E latency
+var e2eP95 = genData(60,260,50);
+var e2eP99 = genData(60,420,80);
+makeMultiLine("chart-fleet-e2e",[{data:e2eP95,color:"#f59e0b"},{data:e2eP99,color:"#ef4444"}],800,160,"ms");
+
+renderKPIs("latency-kpis",[
+  {l:"FLEET TTFT P50",v:"35",u:"ms",c:"var(--gn)",method:"MERGED-PCT"},
+  {l:"FLEET TTFT P95",v:"72",u:"ms",c:"var(--or)",method:"MERGED-PCT"},
+  {l:"FLEET TPOT P50",v:"9.0",u:"ms",c:"var(--gn)",method:"MERGED-PCT"},
+  {l:"FLEET ITL P95",v:"14.2",u:"ms",c:"var(--or)",method:"MERGED-PCT"},
+  {l:"FLEET PREFILL TIME",v:fleetPrefill.toFixed(1),u:"ms",c:"var(--cy)",method:"W-AVG"},
+  {l:"FLEET DECODE TIME",v:fleetDecode.toFixed(1),u:"ms",c:"var(--pu)",method:"W-AVG"},
+  {l:"FLEET QUEUE TIME",v:fleetQueue.toFixed(1),u:"ms",c:"var(--or)",method:"W-AVG"},
+  {l:"FLEET E2E P95",v:"260",u:"ms",c:"var(--or)",method:"MERGED-PCT"}
+]);
+
+// ===== UTILIZATION TAB =====
+makeArea("chart-kv-avg",genData(60,fleetKVAvg,15),400,140,"#8b5cf6","kvAvgF",100,0,"%");
+makeArea("chart-kv-worst",genData(60,fleetKVMax,8),400,140,"#ef4444","kvWF",100,40,"%");
+makeArea("chart-vram-avg",genData(60,fleetVRAMAvg,12),400,140,"#06b6d4","vrAvgF",100,0,"%");
+makeArea("chart-vram-worst",genData(60,fleetVRAMMax,6),400,140,"#ef4444","vrWF",100,40,"%");
+
+// KV Cache gauges
+document.getElementById("kv-gauges").innerHTML = ENDPOINTS.map(function(e,i){
+  var kvColor = e.kvCache>85?"var(--rd)":e.kvCache>60?"var(--or)":"var(--gn)";
+  var warn = e.kvCache>85?' <span style="font-size:10px;color:var(--rd)">\u26A0</span>':'';
+  return '<div class="gauge-card">'+
+    '<div style="font-size:11px;color:var(--td);margin-bottom:4px" class="mono">'+e.id+'</div>'+
+    '<div class="gauge-val" style="color:'+kvColor+'">'+e.kvCache+'%'+warn+'</div>'+
+    '<div class="gpu-bar-bg" style="height:8px;margin:8px 0"><div class="gpu-bar-fill" style="width:'+e.kvCache+'%;background:'+kvColor+';height:100%"></div></div>'+
+    '<div class="gauge-label">'+e.name+' \u00B7 '+e.region+'</div>'+
+  '</div>';
+}).join('');
+
+renderKPIs("util-kpis",[
+  {l:"FLEET KV CACHE AVG",v:fleetKVAvg.toFixed(1),u:"%",c:"var(--pu)",method:"W-AVG"},
+  {l:"FLEET KV CACHE WORST",v:fleetKVMax.toString(),u:"%",sub:ENDPOINTS.filter(function(e){return e.kvCache===fleetKVMax})[0].id,c:fleetKVMax>85?"var(--rd)":"var(--or)",method:"WORST"},
+  {l:"FLEET VRAM AVG",v:fleetVRAMAvg.toFixed(1),u:"%",c:"var(--cy)",method:"W-AVG"},
+  {l:"FLEET VRAM WORST",v:fleetVRAMMax.toString(),u:"%",sub:ENDPOINTS.filter(function(e){return e.vram===fleetVRAMMax})[0].id,c:fleetVRAMMax>85?"var(--rd)":"var(--or)",method:"WORST"}
+]);
+
+// ===== COMPARISON TAB =====
+function renderCompBars(containerId, metric, unit, color, sortDesc){
+  var sorted = ENDPOINTS.slice().sort(function(a,b){return sortDesc?b[metric]-a[metric]:a[metric]-b[metric]});
+  var maxVal = Math.max.apply(null,sorted.map(function(e){return e[metric]}));
+  document.getElementById(containerId).innerHTML = sorted.map(function(e,i){
+    var pct = (e[metric]/maxVal*100).toFixed(0);
+    var c = ENDPOINT_COLORS[ENDPOINTS.indexOf(e)];
+    return '<div class="comp-bar-row">'+
+      '<div class="comp-bar-name">'+e.id+'</div>'+
+      '<div class="comp-bar-track"><div class="comp-bar-fill" style="width:'+pct+'%;background:'+c+'"></div></div>'+
+      '<div class="comp-bar-val mono" style="color:'+c+'">'+e[metric]+unit+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+renderCompBars("comp-ttft","ttft_p95","ms","#f59e0b",true);
+renderCompBars("comp-tpot","tpot_p95","ms","#ef4444",true);
+renderCompBars("comp-error","errorRate","%","#ef4444",true);
+
+// Traffic distribution stacked area
+(function(){
+  var svg=document.getElementById("chart-traffic-dist");if(!svg)return;
+  var w=800,h=200;var cw=w-AX.pl-AX.pr;var ch=h-AX.pt-AX.pb;
+  var n=60;
+  var epData=ENDPOINTS.map(function(e){return genData(n,e.rps,e.rps*0.1)});
+  var html='';
+  var legendHtml='';
+  // Compute stacked totals
+  var stacked=[];
+  for(var layer=0;layer<epData.length;layer++){
+    stacked[layer]=[];
+    for(var i=0;i<n;i++){
+      var prev=layer>0?stacked[layer-1][i]:0;
+      stacked[layer][i]=prev+epData[layer][i];
+    }
+  }
+  var maxV=Math.max.apply(null,stacked[stacked.length-1])*1.05;
+  var axes=axisHTML(cw,ch,maxV,0,"rps");
+  // Render from top to bottom
+  for(var layer=epData.length-1;layer>=0;layer--){
+    var top=stacked[layer];
+    var bottom=layer>0?stacked[layer-1]:new Array(n).fill(0);
+    var topPts=[];var bottomPts=[];
+    for(var i=0;i<n;i++){
+      var x=AX.pl+(i/(n-1))*cw;
+      topPts.push(x.toFixed(1)+","+(AX.pt+ch-top[i]/maxV*ch).toFixed(1));
+      bottomPts.unshift(x.toFixed(1)+","+(AX.pt+ch-bottom[i]/maxV*ch).toFixed(1));
+    }
+    html+='<polygon points="'+topPts.join(" ")+" "+bottomPts.join(" ")+'" fill="'+ENDPOINT_COLORS[layer]+'" opacity="0.6"/>';
+  }
+  svg.innerHTML=html+axes;
+  document.getElementById("traffic-legend").innerHTML=ENDPOINTS.map(function(e,i){
+    return '<div class="legend-item"><span class="legend-line" style="background:'+ENDPOINT_COLORS[i]+'"></span>'+e.id.replace("ep-","")+'</div>';
+  }).join('');
+})();
+
+// Box-and-whisker plot for latency
+(function(){
+  var svg=document.getElementById("chart-latency-box");if(!svg)return;
+  var w=800,h=200;var cw=w-AX.pl-AX.pr;var ch=h-AX.pt-AX.pb;
+  var maxLatency=Math.max.apply(null,ENDPOINTS.map(function(e){return e.e2e_p99}))*1.2;
+  var html='';
+  var axes=axisHTML(cw,ch,maxLatency,0,"ms");
+  var barW=cw/ENDPOINTS.length;
+  ENDPOINTS.forEach(function(e,i){
+    var cx=AX.pl+barW*i+barW/2;
+    var bw=barW*0.5;
+    // Simulate min, q1, median, q3, max from our percentile data
+    var min=e.ttft_p50*0.6;var q1=e.e2e_p95*0.4;var med=e.e2e_p95*0.6;var q3=e.e2e_p95*0.85;var max=e.e2e_p99;
+    function yPos(v){return AX.pt+ch-(v/maxLatency)*ch}
+    // Whisker line (min to max)
+    html+='<line x1="'+cx+'" y1="'+yPos(min).toFixed(1)+'" x2="'+cx+'" y2="'+yPos(max).toFixed(1)+'" stroke="'+ENDPOINT_COLORS[i]+'" stroke-width="1.5"/>';
+    // Min cap
+    html+='<line x1="'+(cx-bw*0.3)+'" y1="'+yPos(min).toFixed(1)+'" x2="'+(cx+bw*0.3)+'" y2="'+yPos(min).toFixed(1)+'" stroke="'+ENDPOINT_COLORS[i]+'" stroke-width="2"/>';
+    // Max cap
+    html+='<line x1="'+(cx-bw*0.3)+'" y1="'+yPos(max).toFixed(1)+'" x2="'+(cx+bw*0.3)+'" y2="'+yPos(max).toFixed(1)+'" stroke="'+ENDPOINT_COLORS[i]+'" stroke-width="2"/>';
+    // Box (q1 to q3)
+    html+='<rect x="'+(cx-bw/2)+'" y="'+yPos(q3).toFixed(1)+'" width="'+bw+'" height="'+(yPos(q1)-yPos(q3)).toFixed(1)+'" fill="'+ENDPOINT_COLORS[i]+'" opacity="0.3" rx="3"/>';
+    html+='<rect x="'+(cx-bw/2)+'" y="'+yPos(q3).toFixed(1)+'" width="'+bw+'" height="'+(yPos(q1)-yPos(q3)).toFixed(1)+'" fill="none" stroke="'+ENDPOINT_COLORS[i]+'" stroke-width="1.5" rx="3"/>';
+    // Median line
+    html+='<line x1="'+(cx-bw/2)+'" y1="'+yPos(med).toFixed(1)+'" x2="'+(cx+bw/2)+'" y2="'+yPos(med).toFixed(1)+'" stroke="'+ENDPOINT_COLORS[i]+'" stroke-width="2.5"/>';
+    // Label
+    html+='<text x="'+cx+'" y="'+(AX.pt+ch+16)+'" fill="rgba(255,255,255,0.6)" font-size="8" font-family="IBM Plex Mono,monospace" text-anchor="middle">'+e.id.replace("ep-","").substring(0,12)+'</text>';
+  });
+  svg.innerHTML=html+axes;
+})();
+
+// Endpoint summary table
+document.getElementById("endpoint-summary-table").innerHTML =
+  '<thead><tr>'+["Endpoint","Model","Region","RPS","TTFT p95","TPOT p95","ITL p95","E2E p95","Error Rate","KV Cache","VRAM","Cost/hr"].map(function(h){return '<th class="mono">'+h+'</th>'}).join('')+'</tr></thead>'+
+  '<tbody>'+ENDPOINTS.map(function(e){
+    return '<tr>'+
+      '<td class="mono" style="font-size:11px;color:var(--ac)">'+e.id+'</td>'+
+      '<td style="font-size:12px;font-weight:500">'+e.name+'</td>'+
+      '<td class="mono" style="font-size:11px">'+e.region+'</td>'+
+      '<td class="mono" style="font-size:12px">'+e.rps.toLocaleString()+'</td>'+
+      '<td class="mono" style="font-size:12px">'+e.ttft_p95+'ms</td>'+
+      '<td class="mono" style="font-size:12px">'+e.tpot_p95+'ms</td>'+
+      '<td class="mono" style="font-size:12px">'+e.itl_p95+'ms</td>'+
+      '<td class="mono" style="font-size:12px">'+e.e2e_p95+'ms</td>'+
+      '<td class="mono" style="font-size:12px;color:'+(e.errorRate>0.1?"var(--rd)":"var(--gn)")+'">'+e.errorRate.toFixed(2)+'%</td>'+
+      '<td class="mono" style="font-size:12px;color:'+(e.kvCache>85?"var(--rd)":e.kvCache>60?"var(--or)":"var(--gn)")+'">'+e.kvCache+'%</td>'+
+      '<td class="mono" style="font-size:12px">'+e.vram+'%</td>'+
+      '<td class="mono" style="font-size:12px;color:var(--or)">$'+e.cost.toFixed(2)+'</td>'+
+    '</tr>';
+  }).join('')+'</tbody>';
+
+// ===== COST TAB =====
+makeArea("chart-gpu-hrs",genData(60,totalGPUHrs/24,totalGPUHrs/24*0.15),800,160,"#8b5cf6","gpuHrF",undefined,undefined,"gpu-hrs");
+makeArea("chart-total-tokens",genData(60,totalTokens/24,totalTokens/24*0.2),400,140,"#06b6d4","tokF",undefined,undefined,"tokens");
+
+// Cost distribution pie
+var costByEp = ENDPOINTS.map(function(e,i){return {n:e.id.replace("ep-",""),v:e.cost,c:ENDPOINT_COLORS[i]}});
+makePie("cost-pie",costByEp);
+document.getElementById("cost-pie-legend").innerHTML = costByEp.map(function(c){
+  return '<div class="pie-item"><span class="pie-dot" style="background:'+c.c+'"></span><span style="flex:1;color:var(--td);font-size:11px">'+c.n+'</span><span class="mono" style="font-size:12px;font-weight:500">$'+c.v.toFixed(2)+'/hr</span></div>';
+}).join('');
+
+renderKPIs("cost-kpis",[
+  {l:"TOTAL GPU-HRS (24H)",v:totalGPUHrs.toLocaleString(),c:"var(--pu)",method:"SUM"},
+  {l:"TOTAL TOKENS (24H)",v:fmtNum(totalTokens),c:"var(--cy)",method:"SUM"},
+  {l:"FLEET COST / HR",v:"$"+totalCostHr.toFixed(2),ch:"Across all endpoints",c:"var(--or)",method:"SUM"},
+  {l:"MONTHLY PROJECTED",v:"$"+(totalCostHr*730).toFixed(0),sub:"Based on current usage",c:"var(--ac)"},
+  {l:"COST / 1M TOKENS",v:"$"+((totalCostHr*24)/(totalTokens/1000000)).toFixed(2),ch:"-$0.12 vs last week",dir:"up",c:"var(--gn)"},
+  {l:"FLEET COST EFFICIENCY",v:"92%",ch:"GPU utilization vs cost",c:"var(--gn)"}
+]);
+
+// ===== TAB SWITCHING =====
+document.querySelectorAll('.nav-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active')});
+    document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')});
+    btn.classList.add('active');
+    document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// Time range buttons
+document.querySelectorAll('.time-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.time-btn').forEach(function(b){b.classList.remove('active')});
+    btn.classList.add('active');
+  });
+});
+
+// Grouping selector
+document.getElementById('group-select').addEventListener('change',function(){
+  var v=this.value;
+  var info=document.getElementById('group-info');
+  if(v==='all') info.textContent='Showing all '+ENDPOINTS.length+' endpoints across 3 regions';
+  else if(v==='model') info.textContent='Grouped by model: 4 models (Llama-3.1-70B, Mixtral-8x22B, Mistral-7B-v0.3, CodeLlama-34B)';
+  else if(v==='region') info.textContent='Grouped by region: NYC1 (4 endpoints), SFO1 (3 endpoints), LON1 (1 endpoint)';
+  else if(v==='gpu') info.textContent='Grouped by GPU: H100-80GB (6 endpoints), A100-80GB (2 endpoints)';
+});
+
+// Auto-refresh
+setInterval(function(){
+  fleetRpsData.shift();fleetRpsData.push(totalRPS+(Math.random()-.5)*totalRPS*0.15);
+  makeArea("chart-fleet-rps",fleetRpsData,800,180,"#3b82f6","fRpsF",undefined,undefined,"rps");
+},5000);
+</script>
+</body>
+</html>
