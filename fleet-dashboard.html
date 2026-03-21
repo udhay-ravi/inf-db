@@ -231,10 +231,19 @@ tr:nth-child(even){background:var(--sf)}
     <div class="sec-title"><span>&#x1F3E5;</span><span class="mono">Fleet Health Summary</span><div class="line"></div></div>
     <div id="fleet-health-table" class="ep-table-card"></div>
 
+    <!-- Group Breakdown (shown when grouped by model/region/gpu) -->
+    <div id="group-breakdown" style="display:none">
+      <div class="sec-title"><span>&#x1F4CA;</span><span class="mono" id="group-breakdown-title">Group Breakdown</span><div class="line"></div></div>
+      <div id="group-breakdown-cards"></div>
+    </div>
+
   </div>
 
   <!-- ======================== LATENCY & PERFORMANCE TAB ======================== -->
   <div class="tab-panel" id="panel-latency">
+
+    <!-- Latency KPIs at top -->
+    <div class="kpi-grid" id="latency-kpis"></div>
 
     <div class="sec-title"><span>&#x23F1;</span><span class="mono">Fleet TTFT (Time to First Token)</span><span class="free-badge">FREE</span><div class="line"></div></div>
     <div class="chart-card fade">
@@ -293,12 +302,13 @@ tr:nth-child(even){background:var(--sf)}
       </div>
     </div>
 
-    <!-- Latency KPIs -->
-    <div class="kpi-grid" id="latency-kpis"></div>
   </div>
 
   <!-- ======================== UTILIZATION TAB ======================== -->
   <div class="tab-panel" id="panel-utilization">
+
+    <!-- Utilization KPIs at top -->
+    <div class="kpi-grid" id="util-kpis"></div>
 
     <div class="sec-title"><span>&#x1F4BE;</span><span class="mono">Fleet KV Cache Utilization</span><span class="free-badge">FREE</span><div class="line"></div></div>
     <div class="chart-row">
@@ -328,8 +338,6 @@ tr:nth-child(even){background:var(--sf)}
     <div class="sec-title"><span>&#x1F50B;</span><span class="mono">KV Cache by Endpoint</span><div class="line"></div></div>
     <div class="gauge-grid" id="kv-gauges"></div>
 
-    <!-- Utilization KPIs -->
-    <div class="kpi-grid" id="util-kpis" style="margin-top:24px"></div>
   </div>
 
   <!-- ======================== CROSS-ENDPOINT COMPARISON TAB ======================== -->
@@ -365,6 +373,9 @@ tr:nth-child(even){background:var(--sf)}
   <!-- ======================== COST & USAGE TAB ======================== -->
   <div class="tab-panel" id="panel-cost">
 
+    <!-- Cost KPIs at top -->
+    <div class="kpi-grid" id="cost-kpis"></div>
+
     <div class="sec-title"><span>&#x23F3;</span><span class="mono">Total GPU-hrs Consumed</span><span class="free-badge">FREE</span><div class="line"></div></div>
     <div class="chart-card fade">
       <div class="chart-header"><span style="font-weight:500">Total GPU-hrs <span class="mono" style="font-size:10px;color:var(--tm);margin-left:8px">SUM across endpoints</span></span><span class="peak mono">Total: 1,248 GPU-hrs</span></div>
@@ -385,8 +396,6 @@ tr:nth-child(even){background:var(--sf)}
       </div>
     </div>
 
-    <!-- Cost KPIs -->
-    <div class="kpi-grid" id="cost-kpis"></div>
   </div>
 
 </div>
@@ -598,25 +607,8 @@ makeArea("chart-fleet-error",fleetErrData,400,140,"#ef4444","fErrF",undefined,un
 var fleetAvailData = genData(60, fleetAvail, 0.06);
 makeArea("chart-fleet-avail",fleetAvailData,400,140,"#10b981","fAvlF",100,99.8,"%");
 
-// ===== FLEET HEALTH TABLE =====
-document.getElementById("fleet-health-table").innerHTML =
-  '<table><thead><tr>'+["Endpoint","Model","Region","GPU","Replicas","Status","RPS","Error Rate","Availability","TTFT p95","KV Cache"].map(function(h){return '<th class="mono">'+h+'</th>'}).join('')+'</tr></thead>'+
-  '<tbody>'+ENDPOINTS.map(function(e){
-    var kvColor = e.kvCache>85?"var(--rd)":e.kvCache>60?"var(--or)":"var(--gn)";
-    return '<tr>'+
-      '<td class="mono" style="font-size:12px;color:var(--ac)">'+e.id+'</td>'+
-      '<td style="font-weight:500;font-size:12px">'+e.name+'</td>'+
-      '<td class="mono" style="font-size:12px">'+e.region+'</td>'+
-      '<td><span class="mono" style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(139,92,246,0.12);color:var(--pu)">'+e.gpu+'</span></td>'+
-      '<td class="mono" style="font-size:12px;text-align:center">'+e.replicas+'</td>'+
-      '<td><span class="dot '+dotClass(e.status)+'"></span><span style="font-size:12px">'+e.status+'</span></td>'+
-      '<td class="mono" style="font-size:12px">'+e.rps.toLocaleString()+'</td>'+
-      '<td class="mono" style="font-size:12px;color:'+(e.errorRate>0.1?"var(--rd)":"var(--gn)")+'">'+e.errorRate.toFixed(2)+'%</td>'+
-      '<td class="mono" style="font-size:12px;color:'+(e.availability<99.95?"var(--or)":"var(--gn)")+'">'+e.availability.toFixed(2)+'%</td>'+
-      '<td class="mono" style="font-size:12px">'+e.ttft_p95+'ms</td>'+
-      '<td style="width:100px"><div style="display:flex;align-items:center;gap:6px"><div class="gpu-bar-bg"><div class="gpu-bar-fill" style="width:'+e.kvCache+'%;background:'+kvColor+'"></div></div><span class="mono" style="font-size:11px;color:var(--td)">'+e.kvCache+'%</span></div></td>'+
-    '</tr>';
-  }).join('')+'</tbody></table>';
+// ===== FLEET HEALTH TABLE (initial render) =====
+applyGrouping('all');
 
 // ===== LATENCY TAB =====
 // Fleet TTFT
@@ -828,14 +820,228 @@ document.querySelectorAll('.time-btn').forEach(function(btn){
   });
 });
 
-// Grouping selector
-document.getElementById('group-select').addEventListener('change',function(){
-  var v=this.value;
+// ===== GROUPING LOGIC =====
+function groupEndpoints(dimension){
+  var groups={};
+  ENDPOINTS.forEach(function(e){
+    var key;
+    if(dimension==='model') key=e.name;
+    else if(dimension==='region') key=e.region;
+    else if(dimension==='gpu') key=e.gpu;
+    else key='All Endpoints';
+    if(!groups[key]) groups[key]=[];
+    groups[key].push(e);
+  });
+  return groups;
+}
+
+function computeGroupMetrics(eps){
+  var totalRps=eps.reduce(function(s,e){return s+e.rps},0);
+  var wAvg=function(field){return eps.reduce(function(s,e){return s+e[field]*e.rps},0)/totalRps};
+  return {
+    count:eps.length,
+    replicas:eps.reduce(function(s,e){return s+e.replicas},0),
+    rps:totalRps,
+    errorRate:wAvg('errorRate'),
+    availability:wAvg('availability'),
+    ttft_p95:wAvg('ttft_p95'),
+    tpot_p95:wAvg('tpot_p95'),
+    itl_p95:wAvg('itl_p95'),
+    e2e_p95:wAvg('e2e_p95'),
+    kvCache:wAvg('kvCache'),
+    kvCacheMax:Math.max.apply(null,eps.map(function(e){return e.kvCache})),
+    vram:wAvg('vram'),
+    vramMax:Math.max.apply(null,eps.map(function(e){return e.vram})),
+    gpuHrs:eps.reduce(function(s,e){return s+e.gpuHrs},0),
+    tokens:eps.reduce(function(s,e){return s+e.tokens},0),
+    cost:eps.reduce(function(s,e){return s+e.cost},0),
+    healthy:eps.filter(function(e){return e.status==='healthy'}).length,
+    degraded:eps.filter(function(e){return e.status==='degraded'}).length,
+    down:eps.filter(function(e){return e.status==='down'}).length
+  };
+}
+
+var GROUP_COLORS=["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16"];
+
+function renderGroupBreakdown(dimension){
+  var bd=document.getElementById('group-breakdown');
+  var title=document.getElementById('group-breakdown-title');
+  var cards=document.getElementById('group-breakdown-cards');
+
+  if(dimension==='all'){
+    bd.style.display='none';
+    return;
+  }
+
+  bd.style.display='block';
+  var dimLabel=dimension==='model'?'Model':dimension==='region'?'Region':'GPU Type';
+  title.textContent='Breakdown by '+dimLabel;
+
+  var groups=groupEndpoints(dimension);
+  var keys=Object.keys(groups);
+  var html='';
+
+  keys.forEach(function(key,ki){
+    var m=computeGroupMetrics(groups[key]);
+    var c=GROUP_COLORS[ki%GROUP_COLORS.length];
+    var stColor=m.degraded>0?'var(--or)':m.down>0?'var(--rd)':'var(--gn)';
+    var stText=m.down>0?'degraded':m.degraded>0?'partially degraded':'healthy';
+
+    html+='<div style="background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:20px 24px;margin-bottom:12px;border-left:4px solid '+c+'">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">'+
+        '<div><div style="font-size:16px;font-weight:700;color:'+c+'">'+key+'</div>'+
+        '<div style="font-size:11px;color:var(--td);margin-top:2px">'+m.count+' endpoint'+(m.count>1?'s':'')+' \u00B7 '+m.replicas+' replica'+(m.replicas>1?'s':'')+' \u00B7 <span class="dot '+(m.degraded>0?'orange':m.down>0?'red':'green')+'"></span>'+stText+'</div></div>'+
+        '<div style="display:flex;gap:16px;flex-wrap:wrap">';
+
+    // Mini KPIs
+    [{l:'RPS',v:m.rps.toLocaleString(),c:'var(--ac)'},
+     {l:'Error Rate',v:m.errorRate.toFixed(3)+'%',c:m.errorRate>0.1?'var(--rd)':'var(--gn)'},
+     {l:'TTFT p95',v:Math.round(m.ttft_p95)+'ms',c:'var(--or)'},
+     {l:'TPOT p95',v:m.tpot_p95.toFixed(1)+'ms',c:'var(--cy)'},
+     {l:'Availability',v:m.availability.toFixed(2)+'%',c:m.availability<99.95?'var(--or)':'var(--gn)'},
+     {l:'KV Cache',v:Math.round(m.kvCache)+'%',c:m.kvCacheMax>85?'var(--rd)':m.kvCache>60?'var(--or)':'var(--gn)'},
+     {l:'Cost/hr',v:'$'+m.cost.toFixed(2),c:'var(--or)'},
+     {l:'GPU-hrs',v:m.gpuHrs.toLocaleString(),c:'var(--pu)'}
+    ].forEach(function(k){
+      html+='<div style="text-align:center;min-width:70px"><div style="font-size:16px;font-weight:700;color:'+k.c+'">'+k.v+'</div><div style="font-size:9px;color:var(--tm);text-transform:uppercase;letter-spacing:.5px">'+k.l+'</div></div>';
+    });
+
+    html+='</div></div>';
+
+    // Endpoint list within group
+    html+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    groups[key].forEach(function(e){
+      html+='<span style="font-size:10px;padding:4px 10px;border-radius:4px;background:rgba(255,255,255,0.05);color:var(--td);border:1px solid var(--bd)" class="mono"><span class="dot '+dotClass(e.status)+'" style="margin-right:2px"></span>'+e.id+' ('+e.region+')</span>';
+    });
+    html+='</div></div>';
+  });
+
+  cards.innerHTML=html;
+}
+
+function updateFleetHealthTable(dimension){
+  var el=document.getElementById('fleet-health-table');
+  if(dimension==='all'){
+    // Show per-endpoint table
+    el.innerHTML=
+      '<table><thead><tr>'+["Endpoint","Model","Region","GPU","Replicas","Status","RPS","Error Rate","Availability","TTFT p95","KV Cache"].map(function(h){return '<th class="mono">'+h+'</th>'}).join('')+'</tr></thead>'+
+      '<tbody>'+ENDPOINTS.map(function(e){
+        var kvColor=e.kvCache>85?"var(--rd)":e.kvCache>60?"var(--or)":"var(--gn)";
+        return '<tr>'+
+          '<td class="mono" style="font-size:12px;color:var(--ac)">'+e.id+'</td>'+
+          '<td style="font-weight:500;font-size:12px">'+e.name+'</td>'+
+          '<td class="mono" style="font-size:12px">'+e.region+'</td>'+
+          '<td><span class="mono" style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(139,92,246,0.12);color:var(--pu)">'+e.gpu+'</span></td>'+
+          '<td class="mono" style="font-size:12px;text-align:center">'+e.replicas+'</td>'+
+          '<td><span class="dot '+dotClass(e.status)+'"></span><span style="font-size:12px">'+e.status+'</span></td>'+
+          '<td class="mono" style="font-size:12px">'+e.rps.toLocaleString()+'</td>'+
+          '<td class="mono" style="font-size:12px;color:'+(e.errorRate>0.1?"var(--rd)":"var(--gn)")+'">'+e.errorRate.toFixed(2)+'%</td>'+
+          '<td class="mono" style="font-size:12px;color:'+(e.availability<99.95?"var(--or)":"var(--gn)")+'">'+e.availability.toFixed(2)+'%</td>'+
+          '<td class="mono" style="font-size:12px">'+e.ttft_p95+'ms</td>'+
+          '<td style="width:100px"><div style="display:flex;align-items:center;gap:6px"><div class="gpu-bar-bg"><div class="gpu-bar-fill" style="width:'+e.kvCache+'%;background:'+kvColor+'"></div></div><span class="mono" style="font-size:11px;color:var(--td)">'+e.kvCache+'%</span></div></td>'+
+        '</tr>';
+      }).join('')+'</tbody></table>';
+  } else {
+    // Show grouped summary table
+    var groups=groupEndpoints(dimension);
+    var keys=Object.keys(groups);
+    var dimLabel=dimension==='model'?'Model':dimension==='region'?'Region':'GPU Type';
+    el.innerHTML=
+      '<table><thead><tr>'+[dimLabel,"Endpoints","Total RPS","W-Avg Error Rate","W-Avg Availability","W-Avg TTFT p95","W-Avg KV Cache","Max KV Cache","Total GPU-hrs","Total Cost/hr"].map(function(h){return '<th class="mono">'+h+'</th>'}).join('')+'</tr></thead>'+
+      '<tbody>'+keys.map(function(key,ki){
+        var m=computeGroupMetrics(groups[key]);
+        return '<tr>'+
+          '<td style="font-weight:600;color:'+GROUP_COLORS[ki%GROUP_COLORS.length]+'">'+key+'</td>'+
+          '<td class="mono" style="font-size:12px;text-align:center">'+m.count+'</td>'+
+          '<td class="mono" style="font-size:12px">'+m.rps.toLocaleString()+'</td>'+
+          '<td class="mono" style="font-size:12px;color:'+(m.errorRate>0.1?"var(--rd)":"var(--gn)")+'">'+m.errorRate.toFixed(3)+'%</td>'+
+          '<td class="mono" style="font-size:12px;color:'+(m.availability<99.95?"var(--or)":"var(--gn)")+'">'+m.availability.toFixed(2)+'%</td>'+
+          '<td class="mono" style="font-size:12px">'+Math.round(m.ttft_p95)+'ms</td>'+
+          '<td class="mono" style="font-size:12px">'+Math.round(m.kvCache)+'%</td>'+
+          '<td class="mono" style="font-size:12px;color:'+(m.kvCacheMax>85?"var(--rd)":"var(--or)")+'">'+m.kvCacheMax+'%</td>'+
+          '<td class="mono" style="font-size:12px">'+m.gpuHrs.toLocaleString()+'</td>'+
+          '<td class="mono" style="font-size:12px;color:var(--or)">$'+m.cost.toFixed(2)+'</td>'+
+        '</tr>';
+      }).join('')+'</tbody></table>';
+  }
+}
+
+function updateBannerForGroup(dimension){
+  var groups=groupEndpoints(dimension);
+  var keys=Object.keys(groups);
+  var banner=document.getElementById('fleet-banner');
+
+  if(dimension==='all'){
+    // Re-render default banner
+    banner.innerHTML=
+      '<div class="fleet-banner-left">'+
+        '<div class="fleet-avail">'+
+          '<div class="fleet-avail-val" style="color:var(--gn)">'+fleetAvail.toFixed(2)+'%</div>'+
+          '<div class="fleet-avail-label mono">Fleet Availability</div>'+
+        '</div>'+
+        '<div class="fleet-status-pills">'+
+          '<div class="fleet-pill" style="background:var(--gnd)"><div><div class="count" style="color:var(--gn)">'+healthyCnt+'</div><div class="label">Healthy</div></div></div>'+
+          '<div class="fleet-pill" style="background:var(--ord)"><div><div class="count" style="color:var(--or)">'+degradedCnt+'</div><div class="label">Degraded</div></div></div>'+
+          '<div class="fleet-pill" style="background:var(--rdd)"><div><div class="count" style="color:var(--rd)">'+downCnt+'</div><div class="label">Down</div></div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:24px;flex-wrap:wrap">'+
+        '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--ac)">'+totalRPS.toLocaleString()+'</div><div style="font-size:10px;color:var(--td)">FLEET RPS</div></div>'+
+        '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--pu)">'+ENDPOINTS.length+'</div><div style="font-size:10px;color:var(--td)">ENDPOINTS</div></div>'+
+        '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--cy)">3</div><div style="font-size:10px;color:var(--td)">REGIONS</div></div>'+
+        '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--or)">$'+totalCostHr.toFixed(2)+'</div><div style="font-size:10px;color:var(--td)">/HR COST</div></div>'+
+      '</div>';
+    return;
+  }
+
+  var dimLabel=dimension==='model'?'Model':dimension==='region'?'Region':'GPU Type';
+  var html='<div class="fleet-banner-left" style="flex:1">'+
+    '<div class="fleet-avail">'+
+      '<div class="fleet-avail-val" style="color:var(--gn)">'+fleetAvail.toFixed(2)+'%</div>'+
+      '<div class="fleet-avail-label mono">Fleet Availability</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+
+  keys.forEach(function(key,ki){
+    var m=computeGroupMetrics(groups[key]);
+    var c=GROUP_COLORS[ki%GROUP_COLORS.length];
+    var stDot=m.down>0?'red':m.degraded>0?'orange':'green';
+    html+='<div style="padding:8px 14px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid var(--bd);min-width:120px">'+
+      '<div style="font-size:12px;font-weight:600;color:'+c+'"><span class="dot '+stDot+'"></span>'+key+'</div>'+
+      '<div style="font-size:10px;color:var(--td);margin-top:2px">'+m.count+' ep \u00B7 '+m.rps.toLocaleString()+' rps</div>'+
+    '</div>';
+  });
+
+  html+='</div></div>'+
+    '<div style="display:flex;gap:24px;flex-wrap:wrap">'+
+      '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--ac)">'+totalRPS.toLocaleString()+'</div><div style="font-size:10px;color:var(--td)">FLEET RPS</div></div>'+
+      '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--pu)">'+keys.length+'</div><div style="font-size:10px;color:var(--td)">'+dimLabel.toUpperCase()+'S</div></div>'+
+      '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--or)">$'+totalCostHr.toFixed(2)+'</div><div style="font-size:10px;color:var(--td)">/HR COST</div></div>'+
+    '</div>';
+
+  banner.innerHTML=html;
+}
+
+function applyGrouping(dimension){
   var info=document.getElementById('group-info');
-  if(v==='all') info.textContent='Showing all '+ENDPOINTS.length+' endpoints across 3 regions';
-  else if(v==='model') info.textContent='Grouped by model: 4 models (Llama-3.1-70B, Mixtral-8x22B, Mistral-7B-v0.3, CodeLlama-34B)';
-  else if(v==='region') info.textContent='Grouped by region: NYC1 (4 endpoints), SFO1 (3 endpoints), LON1 (1 endpoint)';
-  else if(v==='gpu') info.textContent='Grouped by GPU: H100-80GB (6 endpoints), A100-80GB (2 endpoints)';
+  var groups=groupEndpoints(dimension);
+  var keys=Object.keys(groups);
+
+  if(dimension==='all'){
+    info.textContent='Showing all '+ENDPOINTS.length+' endpoints across 3 regions';
+  } else {
+    var dimLabel=dimension==='model'?'model':dimension==='region'?'region':'GPU type';
+    var details=keys.map(function(k){return k+' ('+groups[k].length+')'}).join(', ');
+    info.textContent='Grouped by '+dimLabel+': '+details;
+  }
+
+  updateBannerForGroup(dimension);
+  updateFleetHealthTable(dimension);
+  renderGroupBreakdown(dimension);
+}
+
+document.getElementById('group-select').addEventListener('change',function(){
+  applyGrouping(this.value);
 });
 
 // Auto-refresh
